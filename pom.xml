@@ -16,17 +16,6 @@
 		<relativePath/>
 	</parent>
 
-	<issueManagement>
-		<system>Trac</system>
-		<!-- This may not be a real URL but we could do redirect to a component report in Trac -->
-		<url>https://pds-svn-gbg.pdsvision.net/trac/modules/${project.artifactId}</url>
-	</issueManagement>
-
-	<ciManagement>
-		<system>jenkins</system>
-		<url>http://build.pdsvision.net/</url>
-	</ciManagement>
-
 	<repositories>
 		<repository>
 			<id>repos.open.repo</id>
