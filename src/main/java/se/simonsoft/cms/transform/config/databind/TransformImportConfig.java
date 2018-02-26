@@ -1,7 +1,5 @@
 package se.simonsoft.cms.transform.config.databind;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
 public class TransformImportConfig {
 	
 	private boolean active;
