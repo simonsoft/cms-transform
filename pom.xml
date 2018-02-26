@@ -27,6 +27,12 @@
 	<dependencies>
 		<!-- logging backend for unit tests: log debug and above to console, no need for config file -->
 		<dependency>
+			<groupId>se.simonsoft</groupId>
+			<artifactId>cms-release</artifactId>
+			<version>2.3.0-SNAPSHOT</version>
+		</dependency>
+		
+		<dependency>
 			<groupId>ch.qos.logback</groupId>
 			<artifactId>logback-classic</artifactId>
 			<version>${logback-version}</version>
@@ -39,6 +45,7 @@
 			<version>0.9.0-SNAPSHOT</version>
 			<scope>test</scope>
 		</dependency>
+		
 	</dependencies>
 
 </project>
