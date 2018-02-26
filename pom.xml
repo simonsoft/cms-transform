@@ -11,7 +11,7 @@
 
 	<parent>
 		<groupId>se.simonsoft</groupId>
-		<artifactId>simonsoft-maven-parent</artifactId>
+		<artifactId>cms-maven-parent</artifactId>
 		<version>4.1.2</version>
 		<relativePath/>
 	</parent>
