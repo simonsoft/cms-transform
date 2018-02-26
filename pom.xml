@@ -19,8 +19,8 @@
 	<repositories>
 		<repository>
 			<id>repos.open.repo</id>
-			<name>Repos Open Repository</name>
-			<url>http://reposserver.sourceforge.net/maven/</url>
+			<name>Simonsoft / Repos Open Repository</name>
+			<url>http://opensource.simonsoft.se/maven/</url>
 		</repository>
 	</repositories>
 
