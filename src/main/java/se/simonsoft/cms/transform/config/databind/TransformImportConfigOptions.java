@@ -25,21 +25,3 @@ public class TransformImportConfigOptions {
 	}
 	
 }
-
-
-/*
-{
-    "active": true,
-    "options": {
-        "type": "xsl",
-        "params": {
-            "stylesheet": "/dita/xsl/import.xsl",
-            "stylesheet": "translate-attribute.xsl",
-            "output": "/dita/import",
-            "overwrite": true,
-            "comment": "Import an external file."
-        }
-    }
-}
-
-*/
