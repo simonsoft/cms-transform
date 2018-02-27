@@ -1,9 +1,22 @@
 package se.simonsoft.cms.transform.service;
 
+import java.io.ByteArrayInputStream;
+import java.util.Map;
+
 import javax.inject.Inject;
+import javax.xml.transform.Source;
+import javax.xml.transform.stream.StreamSource;
+
+import org.apache.commons.io.output.ByteArrayOutputStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import se.simonsoft.cms.item.CmsItem;
+import se.simonsoft.cms.item.CmsItemId;
+import se.simonsoft.cms.item.CmsItemPath;
+import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.commit.CmsCommit;
+import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceDocumentS9api;
