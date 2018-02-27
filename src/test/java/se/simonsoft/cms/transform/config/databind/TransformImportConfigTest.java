@@ -24,7 +24,7 @@ public class TransformImportConfigTest {
 	private ObjectWriter writer;
 	private Class<TransformConfig> transformImportConfigClass;
 	
-	private final static String standardConfig = "se/simonsoft/cms/transform/config/databind/standardConfig.json";
+	private final static String standardConfig = "se/simonsoft/cms/transform/config/databind/TransformConfig.json";
 	///cms-transform/src/test/resources/
 
 	@Before

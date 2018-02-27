@@ -1,0 +1,12 @@
+{
+    "active": true,
+    "options": {
+        "type": "xsl",
+        "params": {
+            "stylesheet": "/dita/xsl/import.xsl",
+            "output": "/dita/import",
+            "overwrite": true,
+            "comment": "Import an external file."
+        }
+    }
+}
