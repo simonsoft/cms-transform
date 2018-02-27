@@ -15,10 +15,14 @@ import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
 import se.simonsoft.cms.item.CmsItemPath;
 import se.simonsoft.cms.item.CmsRepository;
+import se.simonsoft.cms.item.RepoRevision;
 import se.simonsoft.cms.item.commit.CmsCommit;
+import se.simonsoft.cms.item.commit.CmsPatchset;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
+import se.simonsoft.cms.item.info.CmsRepositoryLookup;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
+import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceDocumentS9api;
 import se.simonsoft.cms.xmlsource.transform.TransformOptions;
 import se.simonsoft.cms.xmlsource.transform.TransformerService;
 import se.simonsoft.cms.xmlsource.transform.TransformerServiceFactory;
@@ -26,8 +30,9 @@ import se.simonsoft.cms.xmlsource.transform.TransformerServiceFactory;
 public class TransformServiceXsl implements TransformService {
 	
 	private final CmsCommit commit;
-	private final Map<CmsRepository,CmsItemLookup> itemLookups;
+	private final CmsItemLookup itemLookup;
 	private final TransformerServiceFactory transformerServiceFactory;
+	private final CmsRepositoryLookup lookupRepo;
 	private final Map<String, Source> stylesheets;
 	
 	
@@ -36,15 +41,17 @@ public class TransformServiceXsl implements TransformService {
 	@Inject
 	public TransformServiceXsl(
 			CmsCommit commit,
-			Map<CmsRepository,CmsItemLookup> itemLookup,
+			CmsItemLookup itemLookup,
+			CmsRepositoryLookup lookupRepo,
 			TransformerServiceFactory transfromerServiceFactory,
 			Map<String, Source> stylesheets
 			) {
 		
 		this.commit = commit;
-		this.itemLookups = itemLookup;
+		this.itemLookup = itemLookup;
 		this.transformerServiceFactory = transfromerServiceFactory;
 		this.stylesheets = stylesheets;
+		this.lookupRepo = lookupRepo;
 	}
 
 	@Override
@@ -54,8 +61,10 @@ public class TransformServiceXsl implements TransformService {
 			throw new IllegalArgumentException("TransformServiceXsl can only handle xsl transforms but was given: " + config.getOptions().getType());
 		}
 		
+		logger.debug("Starting transform of item: {}", item.getId());
+		
 		final CmsItemId itemId = item.getId();
-		final CmsItemLookup lookup = itemLookups.get(itemId.getRepository());
+		final CmsRepository repository = itemId.getRepository();
 		final Source stylesheetPath = getStylesheetSource(itemId, config);
 		
 		final TransformerService transformerService = transformerServiceFactory.buildTransformerService(stylesheetPath);
@@ -73,13 +82,14 @@ public class TransformServiceXsl implements TransformService {
 		
 		if (stylesheetPath.startsWith("/")) {
 			CmsItemId styleSheetItemId = new CmsItemIdArg(itemId.getRepository(), new CmsItemPath(stylesheetPath));
-			CmsItemLookup lookupStylesheet = itemLookups.get(styleSheetItemId.getRepository());
-			CmsItem styleSheetItem = lookupStylesheet.getItem(styleSheetItemId);
+			logger.debug("Using stylesheet from CMS: {}", styleSheetItemId.getLogicalId());
+			CmsItem styleSheetItem = itemLookup.getItem(styleSheetItemId);
 			
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			styleSheetItem.getContents(baos);
 			resultSource = new StreamSource(new ByteArrayInputStream(baos.toByteArray()));
 		} else {
+			logger.debug("Using CMS built in stylesheet: {}", stylesheetPath);
 			resultSource = stylesheets.get(stylesheetPath); 
 		}
 		
