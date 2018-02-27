@@ -108,19 +108,4 @@ public class TransformImportConfigurationDefaultTest {
 				"}";
 	}
 	
-	private String getOtherConfig() {
-		return "{\n" + 
-				"    \"active\": true,\n" +
-				"    \"other\": \"somevalue\",\n" +
-				"    \"options\": {\n" + 
-				"        \"type\": \"xsl\",\n" + 
-				"        \"params\": {\n" + 
-				"            \"stylesheet\": \"/dita/xsl/import.xsl\",\n" + 
-				"            \"output\": \"/dita/import\",\n" + 
-				"            \"overwrite\": true,\n" + 
-				"            \"comment\": \"Import an external file.\"\n" + 
-				"        }\n" + 
-				"    }\n" + 
-				"}";
-	}
 }
