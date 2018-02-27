@@ -1,9 +1,9 @@
 package se.simonsoft.cms.transform.config.databind;
 
-public class TransformImportConfig {
+public class TransformConfig {
 	
 	private boolean active;
-	private TransformImportConfigOptions options;
+	private TransformConfigOptions options;
 	
 	public boolean isActive() {
 		return active;
@@ -13,11 +13,11 @@ public class TransformImportConfig {
 		this.active = active;
 	}
 	
-	public TransformImportConfigOptions getOptions() {
+	public TransformConfigOptions getOptions() {
 		return options;
 	}
 	
-	public void setOptions(TransformImportConfigOptions options) {
+	public void setOptions(TransformConfigOptions options) {
 		this.options = options;
 	}
 

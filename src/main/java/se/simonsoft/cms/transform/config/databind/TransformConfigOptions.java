@@ -3,7 +3,7 @@ package se.simonsoft.cms.transform.config.databind;
 import java.util.HashMap;
 import java.util.Map;
 
-public class TransformImportConfigOptions {
+public class TransformConfigOptions {
 	
 	private String type;
 	private Map <String, String> params = new HashMap<>();

@@ -22,14 +22,14 @@ public class TransformImportConfigTest {
 	
 	private ObjectReader reader;
 	private ObjectWriter writer;
-	private Class<TransformImportConfig> transformImportConfigClass;
+	private Class<TransformConfig> transformImportConfigClass;
 	
 	private final static String standardConfig = "se/simonsoft/cms/transform/config/databind/standardConfig.json";
 	///cms-transform/src/test/resources/
 
 	@Before
 	public void setUp() {
-		transformImportConfigClass = TransformImportConfig.class;
+		transformImportConfigClass = TransformConfig.class;
 		
 		ObjectMapper objectMapper = new ObjectMapper();
 		this.reader = objectMapper.reader().forType(transformImportConfigClass);
@@ -39,11 +39,11 @@ public class TransformImportConfigTest {
 	@Test
 	public void testDeserializeConfig() throws Exception {
 		
-		TransformImportConfig config = reader.readValue(getConfigStr(standardConfig));
+		TransformConfig config = reader.readValue(getConfigStr(standardConfig));
 		
 		assertEquals(config.isActive(), true);
 		
-		TransformImportConfigOptions options = config.getOptions();
+		TransformConfigOptions options = config.getOptions();
 		assertNotNull(options);
 		assertEquals("xsl", options.getType());
 		
@@ -59,10 +59,10 @@ public class TransformImportConfigTest {
 	@Test
 	public void testSerializeConfig() throws Exception {
 		
-		TransformImportConfig config = new TransformImportConfig();
+		TransformConfig config = new TransformConfig();
 		config.setActive(true);
 		
-		TransformImportConfigOptions options = new TransformImportConfigOptions();
+		TransformConfigOptions options = new TransformConfigOptions();
 		options.setType("xsl");
 		
 		Map<String, String> params = new HashMap<String, String>();
