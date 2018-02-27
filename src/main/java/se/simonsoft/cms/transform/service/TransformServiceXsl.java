@@ -30,7 +30,27 @@ public class TransformServiceXsl implements TransformService {
 	@Override
 	public void transform(CmsItem item, TransformConfig config) {
 		
+	private Source getStylesheetSource(CmsItemId itemId, TransformConfig config) {
+		final String stylesheetPath = config.getOptions().getParams().get("stylesheet");
+		Source resultSource;
 		
+		if (stylesheetPath == null || stylesheetPath.trim().isEmpty()) {
+			throw new IllegalArgumentException("Requires a valid stylesheet path or stylesheet name.");
+		}
+		
+		if (stylesheetPath.startsWith("/")) {
+			CmsItemId styleSheetItemId = new CmsItemIdArg(itemId.getRepository(), new CmsItemPath(stylesheetPath));
+			CmsItemLookup lookupStylesheet = itemLookups.get(styleSheetItemId.getRepository());
+			CmsItem styleSheetItem = lookupStylesheet.getItem(styleSheetItemId);
+			
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			styleSheetItem.getContents(baos);
+			resultSource = new StreamSource(new ByteArrayInputStream(baos.toByteArray()));
+		} else {
+			resultSource = stylesheets.get(stylesheetPath); 
+		}
+		
+		return resultSource;
 	}
 
 }
