@@ -1,6 +1,7 @@
 package se.simonsoft.cms.transform.service;
 
 import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import javax.inject.Inject;
@@ -18,8 +19,13 @@ import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.RepoRevision;
 import se.simonsoft.cms.item.commit.CmsCommit;
 import se.simonsoft.cms.item.commit.CmsPatchset;
+import se.simonsoft.cms.item.commit.FileAdd;
+import se.simonsoft.cms.item.commit.FileReplace;
+import se.simonsoft.cms.item.commit.FolderAdd;
+import se.simonsoft.cms.item.commit.FolderExist;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
+import se.simonsoft.cms.item.info.CmsItemNotFoundException;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceDocumentS9api;
@@ -32,7 +38,7 @@ public class TransformServiceXsl implements TransformService {
 	private final CmsCommit commit;
 	private final CmsItemLookup itemLookup;
 	private final TransformerServiceFactory transformerServiceFactory;
-	private final CmsRepositoryLookup lookupRepo;
+	private final CmsRepositoryLookup repoLookup;
 	private final Map<String, Source> stylesheets;
 	
 	
@@ -51,25 +57,50 @@ public class TransformServiceXsl implements TransformService {
 		this.itemLookup = itemLookup;
 		this.transformerServiceFactory = transfromerServiceFactory;
 		this.stylesheets = stylesheets;
-		this.lookupRepo = lookupRepo;
+		this.repoLookup = lookupRepo;
 	}
 
 	@Override
-	public void transform(CmsItem item, TransformConfig config) {
+	public RepoRevision transform(CmsItem item, TransformConfig config) {
 		
 		if (!config.getOptions().getType().equals("xsl")) {
 			throw new IllegalArgumentException("TransformServiceXsl can only handle xsl transforms but was given: " + config.getOptions().getType());
 		}
-		
+		//TODO: Should the file be locked? what happens if there is concurrent modifications happening?
 		logger.debug("Starting transform of item: {}", item.getId());
 		
 		final CmsItemId itemId = item.getId();
 		final CmsRepository repository = itemId.getRepository();
-		final Source stylesheetPath = getStylesheetSource(itemId, config);
+		final Source stylesheetSource = getStylesheetSource(itemId, config);
 		
-		final TransformerService transformerService = transformerServiceFactory.buildTransformerService(stylesheetPath);
-		transformerService.setItemLookup(lookup);
+		final TransformerService transformerService = transformerServiceFactory.buildTransformerService(stylesheetSource);
+		transformerService.setItemLookup(itemLookup);
 		
+		// Getting the base revision before all item lookups. Hoping that will help catch concurrent operations (svn will refuse copyfrom higher than base?)
+		RepoRevision baseRevision = repoLookup.getYoungest(repository);  
+		
+		XmlSourceDocumentS9api transformed = transformerService.transform(itemId, null);
+		//TODO: Check if empty? should be omitted if it is. how?
+		
+		CmsItemPath outputFolderPath = getOutputPath(itemId, config.getOptions().getParams().get("output"));
+		
+		CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
+		patchset.setHistoryMessage(config.getOptions().getParams().get("comment"));
+		
+		Boolean overwrite = new Boolean(config.getOptions().getParams().get("overwrite"));
+		CmsItemPath completePath = outputFolderPath.append(itemId.getRelPath().getName());
+		logger.debug("complete path: {}", completePath);
+		FileAdd fileAdd = new FileAdd(completePath, transformerService.getTransformStreamProvider(transformed, null));
+		if (!overwrite) {
+			patchset.add(fileAdd);
+		} else {
+			patchset.add(new FileReplace(fileAdd));
+		}
+		
+		RepoRevision rev = commit.run(patchset);
+		logger.debug("Rev after commit: {}", rev.getNumber());
+		
+		return rev;
 	}
 	
 	private Source getStylesheetSource(CmsItemId itemId, TransformConfig config) {
@@ -87,13 +118,36 @@ public class TransformServiceXsl implements TransformService {
 			
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			styleSheetItem.getContents(baos);
-			resultSource = new StreamSource(new ByteArrayInputStream(baos.toByteArray()));
+			resultSource = new StreamSource(baos.toInputStream());
 		} else {
 			logger.debug("Using CMS built in stylesheet: {}", stylesheetPath);
 			resultSource = stylesheets.get(stylesheetPath); 
 		}
 		
 		return resultSource;
+	}
+	
+	private CmsItemPath getOutputPath(CmsItemId itemId, String output) {
+		
+		final CmsRepository repo = itemId.getRepository();
+		CmsItemId itemIdOutput;
+		
+		if (output != null && !output.trim().isEmpty()) {
+			itemIdOutput = new CmsItemIdArg(repo, new CmsItemPath(output));
+			logger.debug("Output folder is specified: {}", output);
+		} else {
+			itemIdOutput = new CmsItemIdArg(repo, itemId.getRelPath().getParent());
+			logger.debug("Output folder is not specified will default to items parent folder.");
+		}
+		
+		//Is there any other way to check if the folder exists, with CmsCommit?
+		try {
+			itemLookup.getItem(itemIdOutput);
+		} catch (CmsItemNotFoundException e) {
+			throw new IllegalArgumentException("Output folder '" + output + "' does not exist in repo '" + repo.getName() + "'.");
+		}
+		
+		return itemIdOutput.getRelPath();
 	}
 
 }
