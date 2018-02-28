@@ -1,7 +1,5 @@
 package se.simonsoft.cms.transform.service;
 
-import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import javax.inject.Inject;
@@ -21,15 +19,12 @@ import se.simonsoft.cms.item.commit.CmsCommit;
 import se.simonsoft.cms.item.commit.CmsPatchset;
 import se.simonsoft.cms.item.commit.FileAdd;
 import se.simonsoft.cms.item.commit.FileReplace;
-import se.simonsoft.cms.item.commit.FolderAdd;
-import se.simonsoft.cms.item.commit.FolderExist;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsItemNotFoundException;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceDocumentS9api;
-import se.simonsoft.cms.xmlsource.transform.TransformOptions;
 import se.simonsoft.cms.xmlsource.transform.TransformerService;
 import se.simonsoft.cms.xmlsource.transform.TransformerServiceFactory;
 
@@ -66,12 +61,21 @@ public class TransformServiceXsl implements TransformService {
 		if (!config.getOptions().getType().equals("xsl")) {
 			throw new IllegalArgumentException("TransformServiceXsl can only handle xsl transforms but was given: " + config.getOptions().getType());
 		}
+		
+		final String stylesheet = config.getOptions().getParams().get("stylesheet");
+		if (stylesheet == null || stylesheet.trim().isEmpty()) {
+			throw new IllegalArgumentException("Requires a valid stylesheet path or stylesheet name.");
+		}
 		//TODO: Should the file be locked? what happens if there is concurrent modifications happening?
 		logger.debug("Starting transform of item: {}", item.getId());
 		
 		final CmsItemId itemId = item.getId();
 		final CmsRepository repository = itemId.getRepository();
-		final Source stylesheetSource = getStylesheetSource(itemId, config);
+		
+		final Source stylesheetSource = getStylesheetSource(itemId, stylesheet);
+		if (stylesheetSource == null) {
+			throw new IllegalArgumentException("Could not find specified stylesheet: " + stylesheet);
+		}
 		
 		final TransformerService transformerService = transformerServiceFactory.buildTransformerService(stylesheetSource);
 		transformerService.setItemLookup(itemLookup);
@@ -103,25 +107,21 @@ public class TransformServiceXsl implements TransformService {
 		return rev;
 	}
 	
-	private Source getStylesheetSource(CmsItemId itemId, TransformConfig config) {
-		final String stylesheetPath = config.getOptions().getParams().get("stylesheet");
+	private Source getStylesheetSource(CmsItemId itemId, String stylesheet) {
+		
 		Source resultSource;
 		
-		if (stylesheetPath == null || stylesheetPath.trim().isEmpty()) {
-			throw new IllegalArgumentException("Requires a valid stylesheet path or stylesheet name.");
-		}
-		
-		if (stylesheetPath.startsWith("/")) {
-			CmsItemId styleSheetItemId = new CmsItemIdArg(itemId.getRepository(), new CmsItemPath(stylesheetPath));
+		if (stylesheet.startsWith("/")) {
+			CmsItemId styleSheetItemId = new CmsItemIdArg(itemId.getRepository(), new CmsItemPath(stylesheet));
 			logger.debug("Using stylesheet from CMS: {}", styleSheetItemId.getLogicalId());
 			CmsItem styleSheetItem = itemLookup.getItem(styleSheetItemId);
 			
-			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			ByteArrayOutputStream baos = new ByteArrayOutputStream(); //safe to load the styleSheet in to memory?
 			styleSheetItem.getContents(baos);
 			resultSource = new StreamSource(baos.toInputStream());
 		} else {
-			logger.debug("Using CMS built in stylesheet: {}", stylesheetPath);
-			resultSource = stylesheets.get(stylesheetPath); 
+			logger.debug("Using CMS built in stylesheet: {}", stylesheet);
+			resultSource = stylesheets.get(stylesheet); 
 		}
 		
 		return resultSource;
@@ -140,7 +140,7 @@ public class TransformServiceXsl implements TransformService {
 			logger.debug("Output folder is not specified will default to items parent folder.");
 		}
 		
-		//Is there any other way to check if the folder exists, with CmsCommit?
+		//Is there any other way to check if the folder exists, for example with CmsCommit?
 		try {
 			itemLookup.getItem(itemIdOutput);
 		} catch (CmsItemNotFoundException e) {
