@@ -17,14 +17,15 @@ import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.RepoRevision;
 import se.simonsoft.cms.item.commit.CmsCommit;
 import se.simonsoft.cms.item.commit.CmsPatchset;
-import se.simonsoft.cms.item.commit.FileAdd;
-import se.simonsoft.cms.item.commit.FileReplace;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsItemNotFoundException;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
-import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceDocumentS9api;
+import se.simonsoft.cms.xmlsource.handler.XmlSourceReader;
+import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceReaderS9api;
+import se.simonsoft.cms.xmlsource.transform.SaxonOutputURIResolverXdm;
+import se.simonsoft.cms.xmlsource.transform.TransformOptions;
 import se.simonsoft.cms.xmlsource.transform.TransformerService;
 import se.simonsoft.cms.xmlsource.transform.TransformerServiceFactory;
 
@@ -35,6 +36,7 @@ public class TransformServiceXsl implements TransformService {
 	private final TransformerServiceFactory transformerServiceFactory;
 	private final CmsRepositoryLookup repoLookup;
 	private final Map<String, Source> stylesheets;
+	private final XmlSourceReaderS9api sourceReader;
 	
 	
 	private static final Logger logger = LoggerFactory.getLogger(TransformServiceXsl.class);
@@ -45,14 +47,20 @@ public class TransformServiceXsl implements TransformService {
 			CmsItemLookup itemLookup,
 			CmsRepositoryLookup lookupRepo,
 			TransformerServiceFactory transfromerServiceFactory,
-			Map<String, Source> stylesheets
+			Map<String, Source> stylesheets,
+			XmlSourceReader sourceReader
 			) {
 		
 		this.commit = commit;
 		this.itemLookup = itemLookup;
+		this.repoLookup = lookupRepo;
 		this.transformerServiceFactory = transfromerServiceFactory;
 		this.stylesheets = stylesheets;
-		this.repoLookup = lookupRepo;
+		if (sourceReader instanceof XmlSourceReaderS9api) {
+			this.sourceReader = (XmlSourceReaderS9api) sourceReader;
+		} else {
+			throw new IllegalArgumentException("TransformServiceXsl requires Saxon S9API impl of XmlSourceReader, got: " + sourceReader.getClass());
+		}
 	}
 
 	@Override
