@@ -1,13 +1,21 @@
 package se.simonsoft.cms.transform.service;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import javax.inject.Inject;
 import javax.xml.transform.Source;
 import javax.xml.transform.stream.StreamSource;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -105,40 +113,51 @@ public class TransformServiceXsl implements TransformService {
 		TransformOptions transformOptions = new TransformOptions();
 		transformOptions.setOutputURIResolver(outputURIResolver);
 		
+		final Map<CmsItemPath, XmlSourceDocumentS9api> resultDocuments = new HashMap<CmsItemPath, XmlSourceDocumentS9api>();
+		
 		XmlSourceDocumentS9api transform = transformerService.transform(itemId, transformOptions);
+		resultDocuments.put(outputPath.append(itemId.getRelPath().getName()), transform);
 		
 		final Boolean overwrite = new Boolean(config.getOptions().getParams().get("overwrite"));
 		Set<String> resultDocsHrefs = outputURIResolver.getResultDocumentHrefs();
 		
 		for (String relpath: resultDocsHrefs) {
-			final CmsItemPath completePath =  new CmsItemPath(outputPath.getPath().concat("/").concat(relpath));
-			logger.debug("Will try to commit item with path: '{}'", completePath.getPath());
-			
 			XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(relpath);
-			TransformStreamProvider transformStreamProvider = transformerService.getTransformStreamProvider(resultDocument, null);
+			resultDocuments.put(new CmsItemPath(outputPath.getPath().concat("/").concat(relpath)), resultDocument);
+		}
+		List<CmsPatchset> patchsets = new ArrayList<>();
+		for (Entry<CmsItemPath, XmlSourceDocumentS9api> entry: resultDocuments.entrySet()) {
+			logger.debug("Will try to commit item with path: '{}'", entry.getKey());
+			TransformStreamProvider transformStreamProvider = transformerService.getTransformStreamProvider(entry.getValue(), null);
 			
 			CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
 			patchset.setHistoryMessage(config.getOptions().getParams().get("comment"));
 			
-			final boolean pathExists = pathExists(repository, completePath);
+			final boolean pathExists = pathExists(repository, entry.getKey());
 			if (!pathExists) {
-				logger.debug("No file at path: '{}' will add new file.", completePath);
-				FileAdd fileAdd = new FileAdd(completePath, transformStreamProvider);
+				logger.debug("No file at path: '{}' will add new file.", entry.getKey());
+				FileAdd fileAdd = new FileAdd(entry.getKey(), transformStreamProvider);
 				patchset.add(fileAdd);
 			} else if (overwrite){
-				logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", completePath.getPath());
+				logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", entry.getKey().getPath());
 				ByteArrayOutputStream baseContent = new ByteArrayOutputStream();
 				base.getContents(baseContent); //Loading whole base file in to memory... dangerous.
 				ByteArrayInputStream baseFile = new ByteArrayInputStream(baseContent.toByteArray());
-				patchset.add(new FileModification(completePath, baseFile, transformStreamProvider.get()));
+				patchset.add(new FileModification(entry.getKey(), baseFile, transformStreamProvider.get()));
 			} else {
 				throw new IllegalStateException("Item already exists and config prohibiting overwrite of existing items.");
 			}
-			commit.run(patchset);
+			patchsets.add(patchset);
 		}
+		
+		for (CmsPatchset p: patchsets) {
+			commit.run(p);
+		}
+		
 		return null;
 	}
 	
+
 	private CmsItemPath getOutputPath(CmsItemId itemId, String output) {
 		
 		CmsItemPath pathResult;
