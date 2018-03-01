@@ -105,23 +105,50 @@ public class TransformServiceXsl implements TransformService {
 		TransformOptions transformOptions = new TransformOptions();
 		transformOptions.setOutputURIResolver(outputURIResolver);
 		
-		// Getting the base revision before all item lookups. Hoping that will help catch concurrent operations (svn will refuse copyfrom higher than base?)
-		RepoRevision baseRevision = repoLookup.getYoungest(repository);
+		XmlSourceDocumentS9api transform = transformerService.transform(itemId, transformOptions);
 		
+		final Boolean overwrite = new Boolean(config.getOptions().getParams().get("overwrite"));
+		Set<String> resultDocsHrefs = outputURIResolver.getResultDocumentHrefs();
 		
-		CmsItemPath outputFolderPath = getOutputPath(itemId, config.getOptions().getParams().get("output"));
+		for (String relpath: resultDocsHrefs) {
+			final CmsItemPath completePath =  new CmsItemPath(outputPath.getPath().concat("/").concat(relpath));
+			logger.debug("Will try to commit item with path: '{}'", completePath.getPath());
+			
+			XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(relpath);
+			TransformStreamProvider transformStreamProvider = transformerService.getTransformStreamProvider(resultDocument, null);
+			
+			CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
+			patchset.setHistoryMessage(config.getOptions().getParams().get("comment"));
+			
+			final boolean pathExists = pathExists(repository, completePath);
+			if (!pathExists) {
+				logger.debug("No file at path: '{}' will add new file.", completePath);
+				FileAdd fileAdd = new FileAdd(completePath, transformStreamProvider);
+				patchset.add(fileAdd);
+			} else if (overwrite){
+				logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", completePath.getPath());
+				ByteArrayOutputStream baseContent = new ByteArrayOutputStream();
+				base.getContents(baseContent); //Loading whole base file in to memory... dangerous.
+				ByteArrayInputStream baseFile = new ByteArrayInputStream(baseContent.toByteArray());
+				patchset.add(new FileModification(completePath, baseFile, transformStreamProvider.get()));
+			} else {
+				throw new IllegalStateException("Item already exists and config prohibiting overwrite of existing items.");
+			}
+			commit.run(patchset);
+		}
+		return null;
+	}
+	
+	private CmsItemPath getOutputPath(CmsItemId itemId, String output) {
 		
-		CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
-		patchset.setHistoryMessage(config.getOptions().getParams().get("comment"));
+		CmsItemPath pathResult;
 		
-		Boolean overwrite = new Boolean(config.getOptions().getParams().get("overwrite"));
-		CmsItemPath completePath = outputFolderPath.append(itemId.getRelPath().getName());
-		logger.debug("complete path: {}", completePath);
-		FileAdd fileAdd = new FileAdd(completePath, transformerService.getTransformStreamProvider(transformed, null));
-		if (!overwrite) {
-			patchset.add(fileAdd);
+		if (output == null || output.trim().isEmpty()) {
+			pathResult = new CmsItemIdArg(itemId.getRepository(), itemId.getRelPath().getParent()).getRelPath();
+			logger.debug("Output folder is not specified will default to items parent folder.");
 		} else {
-			patchset.add(new FileReplace(fileAdd));
+			pathResult = new CmsItemIdArg(itemId.getRepository(), new CmsItemPath(output)).getRelPath();
+			logger.debug("Output folder is specified: {}", output);
 		}
 		
 		return pathResult;
