@@ -95,15 +95,15 @@ public class TransformServiceXsl implements TransformService {
 			throw new IllegalArgumentException("Could not find specified stylesheet: " + stylesheet);
 		}
 		
+		final RepoRevision baseRevision = repoLookup.getYoungest(repository);
+		
 		final TransformerService transformerService = transformerServiceFactory.buildTransformerService(stylesheetSource);
 		transformerService.setItemLookup(itemLookup);
 		
-		TransformOptions transformOptions = new TransformOptions();
 		SaxonOutputURIResolverXdm outputURIResolver = new SaxonOutputURIResolverXdm(sourceReader);
-		transformOptions.setOutputURIResolver(outputURIResolver);
 		
-		transformerService.transform(itemId, transformOptions);
-		//TODO: Check if empty? should be omitted if it is. how?
+		TransformOptions transformOptions = new TransformOptions();
+		transformOptions.setOutputURIResolver(outputURIResolver);
 		
 		// Getting the base revision before all item lookups. Hoping that will help catch concurrent operations (svn will refuse copyfrom higher than base?)
 		RepoRevision baseRevision = repoLookup.getYoungest(repository);
@@ -124,12 +124,9 @@ public class TransformServiceXsl implements TransformService {
 			patchset.add(new FileReplace(fileAdd));
 		}
 		
-		RepoRevision rev = commit.run(patchset);
-		logger.debug("Rev after commit: {}", rev.getNumber());
-		
-		return rev;
+		return pathResult;
 	}
-	
+
 	private Source getStylesheetSource(CmsItemId itemId, String stylesheet) {
 		
 		Source resultSource;
