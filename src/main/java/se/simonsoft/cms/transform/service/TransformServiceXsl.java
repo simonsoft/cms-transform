@@ -72,6 +72,10 @@ public class TransformServiceXsl implements TransformService {
 	@Override
 	public RepoRevision transform(CmsItem item, TransformConfig config) {
 		
+		final CmsItem base = item;
+		final CmsItemId itemId = base.getId();
+		final CmsRepository repository = itemId.getRepository();
+		
 		if (!config.getOptions().getType().equals("xsl")) {
 			throw new IllegalArgumentException("TransformServiceXsl can only handle xsl transforms but was given: " + config.getOptions().getType());
 		}
@@ -81,8 +85,10 @@ public class TransformServiceXsl implements TransformService {
 			throw new IllegalArgumentException("Requires a valid stylesheet path or stylesheet name.");
 		}
 		
-		final CmsItemId itemId = item.getId();
-		final CmsRepository repository = itemId.getRepository();
+		final CmsItemPath outputPath = getOutputPath(itemId ,config.getOptions().getParams().get("output"));
+		if (!pathExists(repository, outputPath)) {
+			throw new IllegalArgumentException("Specified output must be an existing folder: " + outputPath.getPath());
+		}
 		
 		final Source stylesheetSource = getStylesheetSource(itemId, stylesheet);
 		if (stylesheetSource == null) {
@@ -144,27 +150,19 @@ public class TransformServiceXsl implements TransformService {
 		return resultSource;
 	}
 	
-	private CmsItemPath getOutputPath(CmsItemId itemId, String output) {
+	private boolean pathExists(CmsRepository repo, CmsItemPath path) {
 		
-		final CmsRepository repo = itemId.getRepository();
-		CmsItemId itemIdOutput;
+		CmsItemId itemIdOutput = new CmsItemIdArg(repo, path);
+		boolean result = false;
 		
-		if (output != null && !output.trim().isEmpty()) {
-			itemIdOutput = new CmsItemIdArg(repo, new CmsItemPath(output));
-			logger.debug("Output folder is specified: {}", output);
-		} else {
-			itemIdOutput = new CmsItemIdArg(repo, itemId.getRelPath().getParent());
-			logger.debug("Output folder is not specified will default to items parent folder.");
-		}
-		
-		//Is there any other way to check if the folder exists, for example with CmsCommit?
 		try {
 			itemLookup.getItem(itemIdOutput);
+			result = true;
 		} catch (CmsItemNotFoundException e) {
-			throw new IllegalArgumentException("Output folder '" + output + "' does not exist in repo '" + repo.getName() + "'.");
+			result = false;
 		}
 		
-		return itemIdOutput.getRelPath();
+		return result;
 	}
 
 }
