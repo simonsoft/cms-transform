@@ -28,6 +28,7 @@ import se.simonsoft.cms.item.info.CmsRepositoryLookup;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.transform.config.databind.TransformConfigOptions;
 import se.simonsoft.cms.transform.testconfig.TestFileXmlSetUp;
+import se.simonsoft.cms.xmlsource.handler.XmlSourceReader;
 import se.simonsoft.cms.xmlsource.transform.TransformerServiceFactory;
 
 public class TransformServiceXslTest {
@@ -60,7 +61,8 @@ public class TransformServiceXslTest {
 		lookup = indexing.getContext().getInstance(CmsItemLookup.class);
 		repoLookup = indexing.getContext().getInstance(CmsRepositoryLookup.class);
 		TransformerServiceFactory s = indexing.getContext().getInstance(TransformerServiceFactory.class);
-		transformService = new TransformServiceXsl(commit, lookup, repoLookup, s, null); // may exist a injected version. 
+		XmlSourceReader sourceReader = indexing.getContext().getInstance(XmlSourceReader.class);
+		transformService = new TransformServiceXsl(commit, lookup, repoLookup, s, null, sourceReader); // may exist a injected version. 
 	}
 
 	@AfterClass
@@ -230,7 +232,6 @@ public class TransformServiceXslTest {
 		} catch (IllegalArgumentException e) {
 			assertEquals("Output folder '/xml/nonexisting' does not exist in repo 'repo1'.", e.getMessage());
 		}
-		fail("mutliple transforms is not supported yet");
 	}
 
 	@Test
@@ -263,7 +264,6 @@ public class TransformServiceXslTest {
 		String string = baos.toString(StandardCharsets.UTF_8.name());
 		System.out.println("transformed!!: " +  string);
 		assertTrue(string.contains("multiple-output=\"true\""));
-		fail("mutliple transforms is not supported yet");
 	}
 
 	@Test
@@ -302,7 +302,6 @@ public class TransformServiceXslTest {
 		} catch(IllegalStateException e) {
 			assertEquals("Attempt to Add file on existing path: /doc/transform-test.xml", e.getMessage());
 		}
-		fail("mutliple transforms is not supported yet");
 	}
 
 	@Test
@@ -340,7 +339,6 @@ public class TransformServiceXslTest {
 
 		String string = baos.toString(StandardCharsets.UTF_8.name());
 		assertTrue(string.contains("multiple-output=\"true\""));
-		fail("mutliple transforms is not supported yet");
 
 	}
 
