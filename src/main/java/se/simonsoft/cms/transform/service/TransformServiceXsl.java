@@ -80,8 +80,6 @@ public class TransformServiceXsl implements TransformService {
 		if (stylesheet == null || stylesheet.trim().isEmpty()) {
 			throw new IllegalArgumentException("Requires a valid stylesheet path or stylesheet name.");
 		}
-		//TODO: Should the file be locked? what happens if there is concurrent modifications happening?
-		logger.debug("Starting transform of item: {}", item.getId());
 		
 		final CmsItemId itemId = item.getId();
 		final CmsRepository repository = itemId.getRepository();
