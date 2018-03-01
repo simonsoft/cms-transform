@@ -125,38 +125,40 @@ public class TransformServiceXsl implements TransformService {
 			XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(relpath);
 			resultDocuments.put(new CmsItemPath(outputPath.getPath().concat("/").concat(relpath)), resultDocument);
 		}
-		List<CmsPatchset> patchsets = new ArrayList<>();
+		
+		final List<CmsPatchset> patchsets = new ArrayList<>();
 		for (Entry<CmsItemPath, XmlSourceDocumentS9api> entry: resultDocuments.entrySet()) {
-			logger.debug("Will try to commit item with path: '{}'", entry.getKey());
+			CmsItemPath path = entry.getKey();
+			logger.debug("Will try to commit item with path: '{}'", path);
 			TransformStreamProvider transformStreamProvider = transformerService.getTransformStreamProvider(entry.getValue(), null);
 			
 			CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
 			patchset.setHistoryMessage(config.getOptions().getParams().get("comment"));
 			
-			final boolean pathExists = pathExists(repository, entry.getKey());
+			boolean pathExists = pathExists(repository, path);
 			if (!pathExists) {
-				logger.debug("No file at path: '{}' will add new file.", entry.getKey());
-				FileAdd fileAdd = new FileAdd(entry.getKey(), transformStreamProvider);
+				logger.debug("No file at path: '{}' will add new file.", path);
+				FileAdd fileAdd = new FileAdd(path, transformStreamProvider);
 				patchset.add(fileAdd);
 			} else if (overwrite){
-				logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", entry.getKey().getPath());
+				logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", path.getPath());
 				ByteArrayOutputStream baseContent = new ByteArrayOutputStream();
 				base.getContents(baseContent); //Loading whole base file in to memory... dangerous.
 				ByteArrayInputStream baseFile = new ByteArrayInputStream(baseContent.toByteArray());
-				patchset.add(new FileModification(entry.getKey(), baseFile, transformStreamProvider.get()));
+				patchset.add(new FileModification(path, baseFile, transformStreamProvider.get()));
 			} else {
-				throw new IllegalStateException("Item already exists and config prohibiting overwrite of existing items.");
+				throw new IllegalStateException("Item already exists, config prohibiting overwrite of existing items.");
 			}
 			patchsets.add(patchset);
 		}
 		
 		for (CmsPatchset p: patchsets) {
-			commit.run(p);
+			RepoRevision run = commit.run(p);
+			logger.debug("commited version: {} p: {}", run.getNumber(), p.getBaseRevision());
 		}
 		
 		return null;
 	}
-	
 
 	private CmsItemPath getOutputPath(CmsItemId itemId, String output) {
 		
