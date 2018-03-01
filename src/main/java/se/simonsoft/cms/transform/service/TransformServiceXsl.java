@@ -1,6 +1,8 @@
 package se.simonsoft.cms.transform.service;
 
+import java.io.ByteArrayInputStream;
 import java.util.Map;
+import java.util.Set;
 
 import javax.inject.Inject;
 import javax.xml.transform.Source;
@@ -17,15 +19,19 @@ import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.RepoRevision;
 import se.simonsoft.cms.item.commit.CmsCommit;
 import se.simonsoft.cms.item.commit.CmsPatchset;
+import se.simonsoft.cms.item.commit.FileAdd;
+import se.simonsoft.cms.item.commit.FileModification;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsItemNotFoundException;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.xmlsource.handler.XmlSourceReader;
+import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceDocumentS9api;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceReaderS9api;
 import se.simonsoft.cms.xmlsource.transform.SaxonOutputURIResolverXdm;
 import se.simonsoft.cms.xmlsource.transform.TransformOptions;
+import se.simonsoft.cms.xmlsource.transform.TransformStreamProvider;
 import se.simonsoft.cms.xmlsource.transform.TransformerService;
 import se.simonsoft.cms.xmlsource.transform.TransformerServiceFactory;
 
