@@ -88,11 +88,16 @@ public class TransformServiceXsl implements TransformService {
 		final TransformerService transformerService = transformerServiceFactory.buildTransformerService(stylesheetSource);
 		transformerService.setItemLookup(itemLookup);
 		
-		// Getting the base revision before all item lookups. Hoping that will help catch concurrent operations (svn will refuse copyfrom higher than base?)
-		RepoRevision baseRevision = repoLookup.getYoungest(repository);  
+		TransformOptions transformOptions = new TransformOptions();
+		SaxonOutputURIResolverXdm outputURIResolver = new SaxonOutputURIResolverXdm(sourceReader);
+		transformOptions.setOutputURIResolver(outputURIResolver);
 		
-		XmlSourceDocumentS9api transformed = transformerService.transform(itemId, null);
+		transformerService.transform(itemId, transformOptions);
 		//TODO: Check if empty? should be omitted if it is. how?
+		
+		// Getting the base revision before all item lookups. Hoping that will help catch concurrent operations (svn will refuse copyfrom higher than base?)
+		RepoRevision baseRevision = repoLookup.getYoungest(repository);
+		
 		
 		CmsItemPath outputFolderPath = getOutputPath(itemId, config.getOptions().getParams().get("output"));
 		
