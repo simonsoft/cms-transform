@@ -1,6 +1,8 @@
 package se.simonsoft.cms.transform.config.databind;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
@@ -25,7 +27,6 @@ public class TransformImportConfigTest {
 	private Class<TransformConfig> transformImportConfigClass;
 	
 	private final static String standardConfig = "se/simonsoft/cms/transform/config/databind/TransformConfig.json";
-	///cms-transform/src/test/resources/
 
 	@Before
 	public void setUp() {
