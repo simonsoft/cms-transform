@@ -204,5 +204,16 @@ public class TransformServiceXsl implements TransformService {
 		
 		return result;
 	}
+	
+	private InputStream checkStreamIsNotEmpty(InputStream inputStream) throws IOException {
+		PushbackInputStream pushbackInputStream = new PushbackInputStream(inputStream);
+		int b;
+		b = pushbackInputStream.read();
+		if ( b == -1 ) {
+			logger.debug("Stream is empty, discard transformed item.");
+		}
+		pushbackInputStream.unread(b);
+		return pushbackInputStream;
+	}
 
 }
