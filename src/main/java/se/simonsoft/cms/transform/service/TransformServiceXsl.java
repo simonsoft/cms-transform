@@ -3,6 +3,7 @@ package se.simonsoft.cms.transform.service;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PushbackInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -126,15 +127,13 @@ public class TransformServiceXsl implements TransformService {
 			resultDocuments.put(new CmsItemPath(outputPath.getPath().concat("/").concat(relpath)), resultDocument);
 		}
 		
-		final List<CmsPatchset> patchsets = new ArrayList<>();
+		CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
+		patchset.setHistoryMessage(config.getOptions().getParams().get("comment"));
 		for (Entry<CmsItemPath, XmlSourceDocumentS9api> entry: resultDocuments.entrySet()) {
 			CmsItemPath path = entry.getKey();
 			logger.debug("Will try to commit item with path: '{}'", path);
 			TransformStreamProvider transformStreamProvider = transformerService.getTransformStreamProvider(entry.getValue(), null);
-			
-			CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
-			patchset.setHistoryMessage(config.getOptions().getParams().get("comment"));
-			
+
 			boolean pathExists = pathExists(repository, path);
 			if (!pathExists) {
 				logger.debug("No file at path: '{}' will add new file.", path);
@@ -143,20 +142,16 @@ public class TransformServiceXsl implements TransformService {
 			} else if (overwrite){
 				logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", path.getPath());
 				ByteArrayOutputStream baseContent = new ByteArrayOutputStream();
-				base.getContents(baseContent); //Loading whole base file in to memory... dangerous.
+				base.getContents(baseContent); //Loading whole base file in to memory could be large Lock item and use fileModifactionLoced.
 				ByteArrayInputStream baseFile = new ByteArrayInputStream(baseContent.toByteArray());
 				patchset.add(new FileModification(path, baseFile, transformStreamProvider.get()));
 			} else {
 				throw new IllegalStateException("Item already exists, config prohibiting overwrite of existing items.");
 			}
-			patchsets.add(patchset);
 		}
-		
-		for (CmsPatchset p: patchsets) {
-			RepoRevision run = commit.run(p);
-			logger.debug("commited version: {} p: {}", run.getNumber(), p.getBaseRevision());
-		}
-		
+
+		RepoRevision run = commit.run(patchset);
+
 		return null;
 	}
 
