@@ -21,6 +21,7 @@ import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import net.sf.saxon.functions.Empty;
 import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
 import se.simonsoft.cms.item.CmsItemPath;
@@ -52,6 +53,7 @@ public class TransformServiceXsl implements TransformService {
 	private final CmsRepositoryLookup repoLookup;
 	private final Map<String, Source> stylesheets;
 	private final XmlSourceReaderS9api sourceReader;
+	private final TransformerService transformIdentity;
 	
 	
 	private static final Logger logger = LoggerFactory.getLogger(TransformServiceXsl.class);
@@ -62,6 +64,7 @@ public class TransformServiceXsl implements TransformService {
 			CmsItemLookup itemLookup,
 			CmsRepositoryLookup lookupRepo,
 			TransformerServiceFactory transfromerServiceFactory,
+			TransformerService identityTransform,
 			Map<String, Source> stylesheets,
 			XmlSourceReader sourceReader
 			) {
@@ -70,6 +73,7 @@ public class TransformServiceXsl implements TransformService {
 		this.itemLookup = itemLookup;
 		this.repoLookup = lookupRepo;
 		this.transformerServiceFactory = transfromerServiceFactory;
+		this.transformIdentity = transfromerServiceFactory.buildTransformerService(new StreamSource(this.getClass().getClassLoader().getResourceAsStream("se/simonsoft/cms/xmlsource/transform/identity.xsl")));
 		this.stylesheets = stylesheets;
 		if (sourceReader instanceof XmlSourceReaderS9api) {
 			this.sourceReader = (XmlSourceReaderS9api) sourceReader;
@@ -132,7 +136,7 @@ public class TransformServiceXsl implements TransformService {
 		for (Entry<CmsItemPath, XmlSourceDocumentS9api> entry: resultDocuments.entrySet()) {
 			CmsItemPath path = entry.getKey();
 			logger.debug("Will try to commit item with path: '{}'", path);
-			TransformStreamProvider transformStreamProvider = transformerService.getTransformStreamProvider(entry.getValue(), null);
+			TransformStreamProvider transformStreamProvider = transformIdentity.getTransformStreamProvider(entry.getValue(), null);
 
 			boolean pathExists = pathExists(repository, path);
 			if (!pathExists) {
