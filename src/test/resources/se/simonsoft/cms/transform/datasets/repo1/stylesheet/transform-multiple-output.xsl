@@ -26,7 +26,7 @@
         </xsl:copy>
     </xsl:template>
 
-    <xsl:template match="/*">
+    <xsl:template match="*">
         <xsl:copy>
             <xsl:attribute name="multiple-output">true</xsl:attribute>
             <xsl:apply-templates select="@* | node()" />
