@@ -1,36 +1,30 @@
 package se.simonsoft.cms.transform.service;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
 import javax.inject.Inject;
 import javax.xml.transform.Source;
 import javax.xml.transform.stream.StreamSource;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.sf.saxon.functions.Empty;
 import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
+import se.simonsoft.cms.item.CmsItemLock;
+import se.simonsoft.cms.item.CmsItemLockCollection;
 import se.simonsoft.cms.item.CmsItemPath;
 import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.RepoRevision;
 import se.simonsoft.cms.item.commit.CmsCommit;
 import se.simonsoft.cms.item.commit.CmsPatchset;
 import se.simonsoft.cms.item.commit.FileAdd;
-import se.simonsoft.cms.item.commit.FileModification;
+import se.simonsoft.cms.item.commit.FileModificationLocked;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsItemNotFoundException;
@@ -121,7 +115,7 @@ public class TransformServiceXsl implements TransformService {
 		transformOptions.setOutputURIResolver(outputURIResolver);
 		
 		TransformStreamProvider transform = transformerService.getTransformStreamProvider(itemId, transformOptions);
-		addToPatchset(patchset, outputPath.append(itemId.getRelPath().getName()), transform, overwrite, base);
+		addToPatchset(patchset, outputPath.append(itemId.getRelPath().getName()), transform, overwrite);
 		
 		Set<String> resultDocsHrefs = outputURIResolver.getResultDocumentHrefs();
 		for (String relpath: resultDocsHrefs) {
@@ -129,15 +123,19 @@ public class TransformServiceXsl implements TransformService {
 			TransformStreamProvider transformStreamProvider = transformerIdentity.getTransformStreamProvider(resultDocument, null);
 			
 			CmsItemPath path = new CmsItemPath(outputPath.getPath().concat("/").concat(relpath));
-			addToPatchset(patchset, path, transformStreamProvider, overwrite, base);
+			addToPatchset(patchset, path, transformStreamProvider, overwrite);
 		}
 		
 		commit.run(patchset);
+		
+		for (CmsItemLock l: patchset.getLocks()) {	
+			commit.unlock(l);
+		}
 
 		return null;
 	}
 	
-	private void addToPatchset(CmsPatchset patchset, CmsItemPath path, TransformStreamProvider streamProvider, boolean overwrite, CmsItem base) {
+	private void addToPatchset(CmsPatchset patchset, CmsItemPath path, TransformStreamProvider streamProvider, boolean overwrite) {
 		
 		boolean pathExists = pathExists(patchset.getRepository(), path);
 		if (!pathExists) {
@@ -146,10 +144,13 @@ public class TransformServiceXsl implements TransformService {
 			patchset.add(fileAdd);
 		} else if (overwrite){
 			logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", path.getPath());
-			ByteArrayOutputStream baseContent = new ByteArrayOutputStream();
-			base.getContents(baseContent); //Loading whole base file in to memory could be large Lock item and use fileModifactionLoced.
-			ByteArrayInputStream baseFile = new ByteArrayInputStream(baseContent.toByteArray());
-			patchset.add(new FileModification(path, baseFile, streamProvider.get()));
+			CmsItemId itemId = new CmsItemIdArg(patchset.getRepository(), path);
+			CmsItemLockCollection locks = commit.lock("Locked for transform", patchset.getBaseRevision(), itemId.getRelPath());
+			if (locks != null && locks.getSingle() == null) {
+				throw new IllegalStateException("Unable to retrieve the lock token after locking " + itemId);
+			}
+			patchset.addLock(locks.getSingle());
+			patchset.add(new FileModificationLocked(path, streamProvider.get()));
 		} else {
 			throw new IllegalStateException("Item already exists, config prohibiting overwrite of existing items.");
 		}
