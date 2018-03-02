@@ -53,7 +53,7 @@ public class TransformServiceXsl implements TransformService {
 	private final CmsRepositoryLookup repoLookup;
 	private final Map<String, Source> stylesheets;
 	private final XmlSourceReaderS9api sourceReader;
-	private final TransformerService transformIdentity;
+	private final TransformerService transformerIdentity;
 	
 	
 	private static final Logger logger = LoggerFactory.getLogger(TransformServiceXsl.class);
@@ -72,7 +72,7 @@ public class TransformServiceXsl implements TransformService {
 		this.itemLookup = itemLookup;
 		this.repoLookup = lookupRepo;
 		this.transformerServiceFactory = transfromerServiceFactory;
-		this.transformIdentity = transfromerServiceFactory.buildTransformerService(new StreamSource(this.getClass().getClassLoader().getResourceAsStream("se/simonsoft/cms/xmlsource/transform/identity.xsl")));
+		this.transformerIdentity = transfromerServiceFactory.buildTransformerService(new StreamSource(this.getClass().getClassLoader().getResourceAsStream("se/simonsoft/cms/xmlsource/transform/identity.xsl")));
 		this.stylesheets = stylesheets;
 		if (sourceReader instanceof XmlSourceReaderS9api) {
 			this.sourceReader = (XmlSourceReaderS9api) sourceReader;
@@ -126,13 +126,13 @@ public class TransformServiceXsl implements TransformService {
 		Set<String> resultDocsHrefs = outputURIResolver.getResultDocumentHrefs();
 		for (String relpath: resultDocsHrefs) {
 			XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(relpath);
-			TransformStreamProvider transformStreamProvider = transformerService.getTransformStreamProvider(resultDocument, null);
+			TransformStreamProvider transformStreamProvider = transformerIdentity.getTransformStreamProvider(resultDocument, null);
+			
 			CmsItemPath path = new CmsItemPath(outputPath.getPath().concat("/").concat(relpath));
-			logger.debug("Adding patchset with path: '{}'", path);
 			addToPatchset(patchset, path, transformStreamProvider, overwrite, base);
 		}
 		
-		RepoRevision run = commit.run(patchset);
+		commit.run(patchset);
 
 		return null;
 	}
