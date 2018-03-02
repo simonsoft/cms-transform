@@ -81,7 +81,7 @@
 		</entry>
 		<entry kind="dir">
 			<name>stylesheet</name>
-			<commit revision="4">
+			<commit revision="1">
 				<author>test</author>
 				<date>2012-10-03T03:53:54.616837Z</date>
 			</commit>

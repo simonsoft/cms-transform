@@ -108,54 +108,52 @@ public class TransformServiceXsl implements TransformService {
 		}
 		
 		final RepoRevision baseRevision = repoLookup.getYoungest(repository);
+		final Boolean overwrite = new Boolean(config.getOptions().getParams().get("overwrite"));
 		
 		final TransformerService transformerService = transformerServiceFactory.buildTransformerService(stylesheetSource);
 		transformerService.setItemLookup(itemLookup);
 		
-		SaxonOutputURIResolverXdm outputURIResolver = new SaxonOutputURIResolverXdm(sourceReader);
+		final CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
+		patchset.setHistoryMessage(config.getOptions().getParams().get("comment"));
 		
+		SaxonOutputURIResolverXdm outputURIResolver = new SaxonOutputURIResolverXdm(sourceReader);
 		TransformOptions transformOptions = new TransformOptions();
 		transformOptions.setOutputURIResolver(outputURIResolver);
 		
-		final Map<CmsItemPath, XmlSourceDocumentS9api> resultDocuments = new HashMap<CmsItemPath, XmlSourceDocumentS9api>();
+		TransformStreamProvider transform = transformerService.getTransformStreamProvider(itemId, transformOptions);
+		addToPatchset(patchset, outputPath.append(itemId.getRelPath().getName()), transform, overwrite, base);
 		
-		XmlSourceDocumentS9api transform = transformerService.transform(itemId, transformOptions);
-		resultDocuments.put(outputPath.append(itemId.getRelPath().getName()), transform);
-		
-		final Boolean overwrite = new Boolean(config.getOptions().getParams().get("overwrite"));
 		Set<String> resultDocsHrefs = outputURIResolver.getResultDocumentHrefs();
-		
 		for (String relpath: resultDocsHrefs) {
 			XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(relpath);
-			resultDocuments.put(new CmsItemPath(outputPath.getPath().concat("/").concat(relpath)), resultDocument);
+			TransformStreamProvider transformStreamProvider = transformerService.getTransformStreamProvider(resultDocument, null);
+			CmsItemPath path = new CmsItemPath(outputPath.getPath().concat("/").concat(relpath));
+			logger.debug("Adding patchset with path: '{}'", path);
+			addToPatchset(patchset, path, transformStreamProvider, overwrite, base);
 		}
 		
-		CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
-		patchset.setHistoryMessage(config.getOptions().getParams().get("comment"));
-		for (Entry<CmsItemPath, XmlSourceDocumentS9api> entry: resultDocuments.entrySet()) {
-			CmsItemPath path = entry.getKey();
-			logger.debug("Will try to commit item with path: '{}'", path);
-			TransformStreamProvider transformStreamProvider = transformIdentity.getTransformStreamProvider(entry.getValue(), null);
-
-			boolean pathExists = pathExists(repository, path);
-			if (!pathExists) {
-				logger.debug("No file at path: '{}' will add new file.", path);
-				FileAdd fileAdd = new FileAdd(path, transformStreamProvider);
-				patchset.add(fileAdd);
-			} else if (overwrite){
-				logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", path.getPath());
-				ByteArrayOutputStream baseContent = new ByteArrayOutputStream();
-				base.getContents(baseContent); //Loading whole base file in to memory could be large Lock item and use fileModifactionLoced.
-				ByteArrayInputStream baseFile = new ByteArrayInputStream(baseContent.toByteArray());
-				patchset.add(new FileModification(path, baseFile, transformStreamProvider.get()));
-			} else {
-				throw new IllegalStateException("Item already exists, config prohibiting overwrite of existing items.");
-			}
-		}
-
 		RepoRevision run = commit.run(patchset);
 
 		return null;
+	}
+	
+	private void addToPatchset(CmsPatchset patchset, CmsItemPath path, TransformStreamProvider streamProvider, boolean overwrite, CmsItem base) {
+		
+		boolean pathExists = pathExists(patchset.getRepository(), path);
+		if (!pathExists) {
+			logger.debug("No file at path: '{}' will add new file.", path);
+			FileAdd fileAdd = new FileAdd(path, streamProvider.get());
+			patchset.add(fileAdd);
+		} else if (overwrite){
+			logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", path.getPath());
+			ByteArrayOutputStream baseContent = new ByteArrayOutputStream();
+			base.getContents(baseContent); //Loading whole base file in to memory could be large Lock item and use fileModifactionLoced.
+			ByteArrayInputStream baseFile = new ByteArrayInputStream(baseContent.toByteArray());
+			patchset.add(new FileModification(path, baseFile, streamProvider.get()));
+		} else {
+			throw new IllegalStateException("Item already exists, config prohibiting overwrite of existing items.");
+		}
+		
 	}
 
 	private CmsItemPath getOutputPath(CmsItemId itemId, String output) {

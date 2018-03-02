@@ -31,6 +31,15 @@
             <xsl:attribute name="multiple-output">true</xsl:attribute>
             <xsl:apply-templates select="@* | node()" />
         </xsl:copy>
+        <!-- <xsl:apply-templates select="//section"/> -->
+    </xsl:template>
+    
+    <xsl:template match="section">
+    	<xsl:result-document  href="sections/{@name}">
+    		<xsl:copy>
+				<xsl:apply-templates select="@* | node()" />
+			</xsl:copy>
+    	</xsl:result-document>
     </xsl:template>
 
 </xsl:stylesheet>

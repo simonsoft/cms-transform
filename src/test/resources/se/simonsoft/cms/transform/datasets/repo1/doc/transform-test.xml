@@ -24,15 +24,11 @@ xml:lang="en-GB">
 	<title>Transform Doc</title>
 	<subtitle>Transform Test</subtitle>
 	<body>
-		<section>
+		<section name="section1.xml">
 			<title>First chapter</title>
 			<p>Once upon a time...</p>
-			<section>
-				<title>Subchapter</title>
-				<p>Subchapters are quite rare in novels.</p>
-			</section>
 		</section>
-		<section>
+		<section name="section2.xml">
 			<title>Second chapter</title>
 			<p>The end is nigh.</p>
 		</section>

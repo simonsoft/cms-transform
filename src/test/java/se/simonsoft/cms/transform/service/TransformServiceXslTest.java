@@ -10,9 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -23,7 +21,6 @@ import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
 import se.simonsoft.cms.item.CmsItemPath;
 import se.simonsoft.cms.item.CmsRepository;
-import se.simonsoft.cms.item.RepoRevision;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
@@ -231,7 +228,6 @@ public class TransformServiceXslTest {
 
 	@Test
 	public void testMultipleOutputFolderDefaultOverwriteTrue() throws Exception {
-		System.out.println("testMultipleOutputFolderDefaultOverwriteTrue start rev: " + startRev);
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
 		CmsItem item = lookup.getItem(itemId);
 
@@ -258,6 +254,24 @@ public class TransformServiceXslTest {
 		String string = baos.toString(StandardCharsets.UTF_8.name());
 		System.out.println("transformed!!: " +  string);
 		assertTrue(string.contains("multiple-output=\"true\""));
+		
+		CmsItemId sec1Id = new CmsItemIdArg(repo, new CmsItemPath(itemId.getRelPath().getParent().getPath().concat("/sections/section1.xml")));
+		CmsItem sec1Item = lookup.getItem(sec1Id);
+		ByteArrayOutputStream baos1 = new ByteArrayOutputStream();
+		sec1Item.getContents(baos1);
+
+		String sect1Str = baos1.toString(StandardCharsets.UTF_8.name());
+		assertTrue(sect1Str.contains("multiple-output=\"true\""));
+		assertTrue(sect1Str.contains("name=\"section1.xml\""));
+		
+		CmsItemId sec2Id = new CmsItemIdArg(repo, new CmsItemPath(itemId.getRelPath().getParent().getPath().concat("/sections/section2.xml")));
+		CmsItem sec2Item = lookup.getItem(sec2Id);
+		ByteArrayOutputStream baos2 = new ByteArrayOutputStream();
+		sec2Item.getContents(baos2);
+
+		String sec2Str = baos2.toString(StandardCharsets.UTF_8.name());
+		assertTrue(sec2Str.contains("multiple-output=\"true\""));
+		assertTrue(sec2Str.contains("name=\"section2.xml\""));
 	}
 
 	@Test
