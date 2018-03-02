@@ -136,25 +136,35 @@ public class TransformServiceXsl implements TransformService {
 	}
 	
 	private void addToPatchset(CmsPatchset patchset, CmsItemPath path, TransformStreamProvider streamProvider, boolean overwrite) {
-		
-		boolean pathExists = pathExists(patchset.getRepository(), path);
-		if (!pathExists) {
-			logger.debug("No file at path: '{}' will add new file.", path);
-			FileAdd fileAdd = new FileAdd(path, streamProvider.get());
-			patchset.add(fileAdd);
-		} else if (overwrite){
-			logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", path.getPath());
-			CmsItemId itemId = new CmsItemIdArg(patchset.getRepository(), path);
-			CmsItemLockCollection locks = commit.lock(TRANSFORM_LOCK_COMMENT, patchset.getBaseRevision(), itemId.getRelPath());
-			if (locks != null && locks.getSingle() == null) {
-				throw new IllegalStateException("Unable to retrieve the lock token after locking " + itemId);
+
+		try {
+			
+			InputStream transformStream = checkStreamIsNotEmpty(streamProvider.get());
+			
+			boolean pathExists = pathExists(patchset.getRepository(), path);
+			if (!pathExists) {
+				logger.debug("No file at path: '{}' will add new file.", path);
+				FileAdd fileAdd = new FileAdd(path, transformStream);
+				patchset.add(fileAdd);
+			} else if (overwrite){
+				logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", path.getPath());
+				CmsItemId itemId = new CmsItemIdArg(patchset.getRepository(), path);
+				CmsItemLockCollection locks = commit.lock(TRANSFORM_LOCK_COMMENT, patchset.getBaseRevision(), itemId.getRelPath());
+				if (locks != null && locks.getSingle() == null) {
+					throw new IllegalStateException("Unable to retrieve the lock token after locking " + itemId);
+				}
+				patchset.addLock(locks.getSingle());
+				patchset.add(new FileModificationLocked(path, transformStream));
+			} else {
+				throw new IllegalStateException("Item already exists, config prohibiting overwrite of existing items.");
 			}
-			patchset.addLock(locks.getSingle());
-			patchset.add(new FileModificationLocked(path, streamProvider.get()));
-		} else {
-			throw new IllegalStateException("Item already exists, config prohibiting overwrite of existing items.");
+
+		} catch (IOException e) {
+			throw new RuntimeException("Failed to read stream from transform.", e);
+		} catch (EmptyStreamException e) {
+			logger.warn("Transform of item at path: '{}'  resulted in empty document, will be discarded.", path);
 		}
-		
+
 	}
 
 	private CmsItemPath getOutputPath(CmsItemId itemId, String output) {
@@ -207,15 +217,25 @@ public class TransformServiceXsl implements TransformService {
 		return result;
 	}
 	
-	private InputStream checkStreamIsNotEmpty(InputStream inputStream) throws IOException {
+	private InputStream checkStreamIsNotEmpty(InputStream inputStream) throws IOException, EmptyStreamException {
 		PushbackInputStream pushbackInputStream = new PushbackInputStream(inputStream);
 		int b;
 		b = pushbackInputStream.read();
 		if ( b == -1 ) {
-			logger.debug("Stream is empty, discard transformed item.");
+			throw new EmptyStreamException("Transform is empty");
 		}
 		pushbackInputStream.unread(b);
 		return pushbackInputStream;
+	}
+	
+	private class EmptyStreamException extends Exception {
+
+		private static final long serialVersionUID = 1L;
+		
+		public EmptyStreamException(String message) {
+			super(message);
+		}
+		
 	}
 
 }
