@@ -114,16 +114,16 @@ public class TransformServiceXsl implements TransformService {
 		TransformOptions transformOptions = new TransformOptions();
 		transformOptions.setOutputURIResolver(outputURIResolver);
 		
-		TransformStreamProvider transform = transformerService.getTransformStreamProvider(itemId, transformOptions);
-		addToPatchset(patchset, outputPath.append(itemId.getRelPath().getName()), transform, overwrite);
+		TransformStreamProvider baseStreamProvider = transformerService.getTransformStreamProvider(itemId, transformOptions);
+		addToPatchset(patchset, outputPath.append(itemId.getRelPath().getName()), baseStreamProvider, overwrite);
 		
 		Set<String> resultDocsHrefs = outputURIResolver.getResultDocumentHrefs();
 		for (String relpath: resultDocsHrefs) {
 			XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(relpath);
-			TransformStreamProvider transformStreamProvider = transformerIdentity.getTransformStreamProvider(resultDocument, null);
+			TransformStreamProvider streamProvider = transformerIdentity.getTransformStreamProvider(resultDocument, null);
 			
 			CmsItemPath path = new CmsItemPath(outputPath.getPath().concat("/").concat(relpath));
-			addToPatchset(patchset, path, transformStreamProvider, overwrite);
+			addToPatchset(patchset, path, streamProvider, overwrite);
 		}
 		
 		commit.run(patchset);
