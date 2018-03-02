@@ -45,7 +45,7 @@ public class TransformServiceXsl implements TransformService {
 	private final CmsItemLookup itemLookup;
 	private final TransformerServiceFactory transformerServiceFactory;
 	private final CmsRepositoryLookup repoLookup;
-	private final Map<String, Source> stylesheets;
+	private final Map<String, TransformerService> stylesheets;
 	private final XmlSourceReaderS9api sourceReader;
 	private final TransformerService transformerIdentity;
 	
@@ -58,7 +58,7 @@ public class TransformServiceXsl implements TransformService {
 			CmsItemLookup itemLookup,
 			CmsRepositoryLookup lookupRepo,
 			TransformerServiceFactory transfromerServiceFactory,
-			Map<String, Source> stylesheets,
+			Map<String, TransformerService> stylesheets,
 			XmlSourceReader sourceReader
 			) {
 		
@@ -76,11 +76,19 @@ public class TransformServiceXsl implements TransformService {
 	}
 
 	@Override
-	public RepoRevision transform(CmsItem item, TransformConfig config) {
+	public void transform(CmsItem item, TransformConfig config) {
+		
+		if (config == null || config.getOptions() == null) {
+			throw new IllegalArgumentException("TransformServiceXsl needs a valid TransformConfig object.");
+		}
 		
 		final CmsItem base = item;
 		final CmsItemId itemId = base.getId();
 		final CmsRepository repository = itemId.getRepository();
+		final RepoRevision baseRevision = repoLookup.getYoungest(repository);
+		
+		
+		final Boolean overwrite = new Boolean(config.getOptions().getParams().get("overwrite"));
 		
 		if (!config.getOptions().getType().equals("xsl")) {
 			throw new IllegalArgumentException("TransformServiceXsl can only handle xsl transforms but was given: " + config.getOptions().getType());
@@ -96,15 +104,10 @@ public class TransformServiceXsl implements TransformService {
 			throw new IllegalArgumentException("Specified output must be an existing folder: " + outputPath.getPath());
 		}
 		
-		final Source stylesheetSource = getStylesheetSource(itemId, stylesheet);
-		if (stylesheetSource == null) {
-			throw new IllegalArgumentException("Could not find specified stylesheet: " + stylesheet);
+		final TransformerService transformerService = getTransformerService(itemId, stylesheet);
+		if (transformerService == null) {
+			throw new IllegalArgumentException("Could not create transformerService with stylesheet: " + stylesheet);
 		}
-		
-		final RepoRevision baseRevision = repoLookup.getYoungest(repository);
-		final Boolean overwrite = new Boolean(config.getOptions().getParams().get("overwrite"));
-		
-		final TransformerService transformerService = transformerServiceFactory.buildTransformerService(stylesheetSource);
 		transformerService.setItemLookup(itemLookup);
 		
 		final CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
@@ -131,8 +134,6 @@ public class TransformServiceXsl implements TransformService {
 		for (CmsItemLock l: patchset.getLocks()) {	
 			commit.unlock(l);
 		}
-
-		return null;
 	}
 	
 	private void addToPatchset(CmsPatchset patchset, CmsItemPath path, TransformStreamProvider streamProvider, boolean overwrite) {
@@ -182,24 +183,24 @@ public class TransformServiceXsl implements TransformService {
 		return pathResult;
 	}
 
-	private Source getStylesheetSource(CmsItemId itemId, String stylesheet) {
+	private TransformerService getTransformerService(CmsItemId itemId, String stylesheet) {
 		
-		Source resultSource;
+		TransformerService resultService;
 		
 		if (stylesheet.startsWith("/")) {
 			CmsItemId styleSheetItemId = new CmsItemIdArg(itemId.getRepository(), new CmsItemPath(stylesheet));
 			logger.debug("Using stylesheet from CMS: {}", styleSheetItemId.getLogicalId());
 			CmsItem styleSheetItem = itemLookup.getItem(styleSheetItemId);
 			
-			ByteArrayOutputStream baos = new ByteArrayOutputStream(); //safe to load the styleSheet in to memory?
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			styleSheetItem.getContents(baos);
-			resultSource = new StreamSource(baos.toInputStream());
+			resultService = transformerServiceFactory.buildTransformerService(new StreamSource(baos.toInputStream()));
 		} else {
 			logger.debug("Using CMS built in stylesheet: {}", stylesheet);
-			resultSource = stylesheets.get(stylesheet); 
+			resultService = stylesheets.get(stylesheet); 
 		}
 		
-		return resultSource;
+		return resultService;
 	}
 	
 	private boolean pathExists(CmsRepository repo, CmsItemPath path) {

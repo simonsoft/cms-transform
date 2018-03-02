@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 
 import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsRepository;
-import se.simonsoft.cms.item.RepoRevision;
 import se.simonsoft.cms.item.events.ItemChangedEventListener;
 import se.simonsoft.cms.transform.config.TransformConfiguration;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
@@ -44,9 +43,9 @@ public class TransformItemChangedEventListener implements ItemChangedEventListen
 		for (Entry<String, TransformConfig> e: configurations.entrySet()) {
 			if (e.getValue().isActive()) {
 				logger.debug("Config: '{}' is active, transforming...", e.getKey());
-				RepoRevision revision = transformService.transform(item, e.getValue());
+				transformService.transform(item, e.getValue());
 				String stylesheet = e.getValue().getOptions().getParams().get("stylesheet");
-				logger.debug("ItemId: {}, has been transformed with stylesheet: '{}', rev: {}", item.getId(), stylesheet, revision.getNumber());
+				logger.debug("ItemId: {}, has been transformed with stylesheet: '{}'", item.getId(), stylesheet);
 			}
 		}
 		

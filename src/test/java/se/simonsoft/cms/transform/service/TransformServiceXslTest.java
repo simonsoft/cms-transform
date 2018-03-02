@@ -9,6 +9,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.xml.transform.stream.StreamSource;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -28,6 +30,7 @@ import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.transform.config.databind.TransformConfigOptions;
 import se.simonsoft.cms.transform.testconfig.TestFileXmlSetUp;
 import se.simonsoft.cms.xmlsource.handler.XmlSourceReader;
+import se.simonsoft.cms.xmlsource.transform.TransformerService;
 import se.simonsoft.cms.xmlsource.transform.TransformerServiceFactory;
 
 public class TransformServiceXslTest {
@@ -59,9 +62,17 @@ public class TransformServiceXslTest {
 		indexing = testSetUp.getIndexing();
 		lookup = indexing.getContext().getInstance(CmsItemLookup.class);
 		repoLookup = indexing.getContext().getInstance(CmsRepositoryLookup.class);
-		TransformerServiceFactory s = indexing.getContext().getInstance(TransformerServiceFactory.class);
+		TransformerServiceFactory transformerServiceFactory = indexing.getContext().getInstance(TransformerServiceFactory.class);
 		XmlSourceReader sourceReader = indexing.getContext().getInstance(XmlSourceReader.class);
-		transformService = new TransformServiceXsl(commit, lookup, repoLookup, s, null, sourceReader); // may exist a injected version. 
+		
+		Map<String, TransformerService> services = new HashMap<>();
+		StreamSource streamSourceMulti = new StreamSource(this.getClass().getClassLoader().getResourceAsStream("se/simonsoft/cms/transform/datasets/repo1/stylesheet/transform-multiple-output.xsl"));
+		StreamSource streamSourceSingle = new StreamSource(this.getClass().getClassLoader().getResourceAsStream("se/simonsoft/cms/transform/datasets/repo1/stylesheet/transform-single-output.xsl"));
+		
+		services.put("transform-multiple-output.xsl", transformerServiceFactory.buildTransformerService(streamSourceMulti));
+		services.put("transform-single-output.xsl", transformerServiceFactory.buildTransformerService(streamSourceSingle));
+		
+		transformService = new TransformServiceXsl(commit, lookup, repoLookup, transformerServiceFactory, services, sourceReader); // may exist a injected version. 
 	}
 
 	@After
@@ -200,7 +211,6 @@ public class TransformServiceXslTest {
 	
 	@Test
 	public void testMultipleOutputFolderDoNotExist() throws Exception {
-		System.out.println("testMultipleOutputFolderDoNotExist start rev: " + startRev);
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
 		CmsItem item = lookup.getItem(itemId);
 
@@ -252,7 +262,6 @@ public class TransformServiceXslTest {
 		itemNew.getContents(baos);
 
 		String string = baos.toString(StandardCharsets.UTF_8.name());
-		System.out.println("transformed!!: " +  string);
 		assertTrue(string.contains("multiple-output=\"true\""));
 		
 		CmsItemId sec1Id = new CmsItemIdArg(repo, new CmsItemPath(itemId.getRelPath().getParent().getPath().concat("/sections/section1.xml")));
@@ -312,7 +321,7 @@ public class TransformServiceXslTest {
 	}
 
 	@Test
-	public void testMultipleOutputFolderExists() throws Exception {
+	public void testMultipleOutputAllItemsExists() throws Exception {
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
 		CmsItem item = lookup.getItem(itemId);
 
@@ -324,6 +333,52 @@ public class TransformServiceXslTest {
 
 		Map<String, String> optionsParams = new HashMap<String, String>();
 		optionsParams.put("stylesheet", "/stylesheet/transform-multiple-output.xsl");
+		optionsParams.put("output", "/transformed/multiple/existing");
+		optionsParams.put("overwrite", "true");
+		optionsParams.put("comment", "Automatic transform!");
+		configOptions.setParams(optionsParams);
+
+		config.setOptions(configOptions);
+
+		transformService.transform(item, config);
+		
+		String outputPath = optionsParams.get("output");
+		
+		CmsItemId sec1Id = new CmsItemIdArg(repo, new CmsItemPath(outputPath.concat("/sections/section1.xml")));
+		CmsItem sec1Item = lookup.getItem(sec1Id.withPegRev(2L));
+		ByteArrayOutputStream baos1 = new ByteArrayOutputStream();
+		sec1Item.getContents(baos1);
+
+		String sec1Str = baos1.toString(StandardCharsets.UTF_8.name());
+		assertTrue(sec1Str.contains("multiple-output=\"true\""));
+		assertTrue(sec1Str.contains("name=\"section1.xml\""));
+		
+		CmsItemId sec2Id = new CmsItemIdArg(repo, new CmsItemPath(outputPath.concat("/sections/section2.xml")));
+		CmsItem sec2Item = lookup.getItem(sec2Id.withPegRev(2L));
+		ByteArrayOutputStream baos2 = new ByteArrayOutputStream();
+		sec2Item.getContents(baos2);
+
+		String sec2Str = baos2.toString(StandardCharsets.UTF_8.name());
+		assertTrue(sec2Str.contains("multiple-output=\"true\""));
+		assertTrue(sec2Str.contains("name=\"section2.xml\""));
+		
+
+	}
+
+	@Test
+	public void testTransformerServiceCmsBuiltIn() throws Exception {
+		
+		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
+		CmsItem item = lookup.getItem(itemId);
+
+		TransformConfig config = new TransformConfig();
+		config.setActive(true);
+
+		TransformConfigOptions configOptions = new TransformConfigOptions();
+		configOptions.setType("xsl");
+
+		Map<String, String> optionsParams = new HashMap<String, String>();
+		optionsParams.put("stylesheet", "transform-multiple-output.xsl");
 		optionsParams.put("output", "/transformed/multiple");
 		optionsParams.put("overwrite", "");
 		optionsParams.put("comment", "Automatic transform!");
@@ -352,27 +407,63 @@ public class TransformServiceXslTest {
 		String sec2Str = baos2.toString(StandardCharsets.UTF_8.name());
 		assertTrue(sec2Str.contains("multiple-output=\"true\""));
 		assertTrue(sec2Str.contains("name=\"section2.xml\""));
-
 	}
+
 
 	@Test
-	@Ignore
-	public void testStylesheetCmsBuiltIn() throws Exception {
-		// stylesheet param is filename.
-	}
+	public void testInvalidConfig() throws Exception {
+		
+		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
+		CmsItem item = lookup.getItem(itemId);
+		
+		try {
+			transformService.transform(item, null);
+		} catch (IllegalArgumentException e) {
+			assertEquals("TransformServiceXsl needs a valid TransformConfig object.", e.getMessage());
+		}
 
+		TransformConfig config = new TransformConfig();
+		config.setActive(true);
+		
+		try {
+			transformService.transform(item, config);
+		} catch (IllegalArgumentException e) {
+			assertEquals("TransformServiceXsl needs a valid TransformConfig object.", e.getMessage());
+		}
+	}
+	
+	@Test
+	public void testMissingTransformerService() throws Exception {
+		
+		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
+		CmsItem item = lookup.getItem(itemId);
+		
+		TransformConfig config = new TransformConfig();
+		config.setActive(true);
+
+		TransformConfigOptions configOptions = new TransformConfigOptions();
+		configOptions.setType("xsl");
+
+		Map<String, String> optionsParams = new HashMap<String, String>();
+		optionsParams.put("stylesheet", "non-existing.xsl");
+		optionsParams.put("output", "/transformed/multiple");
+		optionsParams.put("overwrite", "");
+		optionsParams.put("comment", "Automatic transform!");
+		configOptions.setParams(optionsParams);
+
+		config.setOptions(configOptions);
+		
+		try {
+			transformService.transform(item, config);
+		} catch (IllegalArgumentException e) {
+			assertEquals("Could not create transformerService with stylesheet: non-existing.xsl", e.getMessage());
+		}
+	}
+	
 	@Test
 	@Ignore
 	public void testCommentIsVelocityString() throws Exception {
 		// Future implementation. Comment may be a velocity formated string.
-	}
-
-
-	@Test
-	@Ignore
-	public void testInvalidConfig() throws Exception {
-		// Invalid config
-		// No config
 	}
 
 }
