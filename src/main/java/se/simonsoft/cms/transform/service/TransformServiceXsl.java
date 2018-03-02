@@ -211,7 +211,7 @@ public class TransformServiceXsl implements TransformService {
 			
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			styleSheetItem.getContents(baos);
-			resultService = transformerServiceFactory.buildTransformerService(new StreamSource(IOUtils.toInputStream(baos.toString(), StandardCharsets.UTF_8)));
+			resultService = transformerServiceFactory.buildTransformerService(new StreamSource(IOUtils.toInputStream(baos.toString(StandardCharsets.UTF_8), StandardCharsets.UTF_8)));
 		} else {
 			logger.debug("Using CMS built in stylesheet: {}", stylesheet);
 			resultService = stylesheets.get(stylesheet); 
