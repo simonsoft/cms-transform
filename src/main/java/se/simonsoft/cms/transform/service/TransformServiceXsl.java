@@ -64,7 +64,6 @@ public class TransformServiceXsl implements TransformService {
 			CmsItemLookup itemLookup,
 			CmsRepositoryLookup lookupRepo,
 			TransformerServiceFactory transfromerServiceFactory,
-			TransformerService identityTransform,
 			Map<String, Source> stylesheets,
 			XmlSourceReader sourceReader
 			) {
