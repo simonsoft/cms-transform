@@ -49,7 +49,7 @@ public class TransformServiceXsl implements TransformService {
 	private final XmlSourceReaderS9api sourceReader;
 	private final TransformerService transformerIdentity;
 	
-	
+	private static final String TRANSFORM_LOCK_COMMENT = "Locked for transform";
 	private static final Logger logger = LoggerFactory.getLogger(TransformServiceXsl.class);
 
 	@Inject
@@ -145,7 +145,7 @@ public class TransformServiceXsl implements TransformService {
 		} else if (overwrite){
 			logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", path.getPath());
 			CmsItemId itemId = new CmsItemIdArg(patchset.getRepository(), path);
-			CmsItemLockCollection locks = commit.lock("Locked for transform", patchset.getBaseRevision(), itemId.getRelPath());
+			CmsItemLockCollection locks = commit.lock(TRANSFORM_LOCK_COMMENT, patchset.getBaseRevision(), itemId.getRelPath());
 			if (locks != null && locks.getSingle() == null) {
 				throw new IllegalStateException("Unable to retrieve the lock token after locking " + itemId);
 			}
