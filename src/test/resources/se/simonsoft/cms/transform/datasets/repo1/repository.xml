@@ -80,6 +80,14 @@
 			<properties />
 		</entry>
 		<entry kind="dir">
+			<name>transformed/multiple/existing</name>
+			<commit revision="1">
+				<author>test</author>
+				<date>2012-10-03T03:53:54.616837Z</date>
+			</commit>
+			<properties />
+		</entry>
+		<entry kind="dir">
 			<name>stylesheet</name>
 			<commit revision="1">
 				<author>test</author>
@@ -90,6 +98,36 @@
 		<entry kind="file">
 			<name>doc/transform-test.xml</name>
 			<size>1578</size>
+			<commit revision="1">
+				<author>m</author>
+				<date>2013-01-04T14:33:14.600772Z</date>
+			</commit>
+			<properties>
+			</properties>
+		</entry>
+		<entry kind="file">
+			<name>transformed/multiple/existing/transform-test.xml</name>
+			<size>1200</size>
+			<commit revision="1">
+				<author>m</author>
+				<date>2013-01-04T14:33:14.600772Z</date>
+			</commit>
+			<properties>
+			</properties>
+		</entry>
+		<entry kind="file">
+			<name>transformed/multiple/existing/section1.xml</name>
+			<size>184</size>
+			<commit revision="1">
+				<author>m</author>
+				<date>2013-01-04T14:33:14.600772Z</date>
+			</commit>
+			<properties>
+			</properties>
+		</entry>
+		<entry kind="file">
+			<name>transformed/multiple/existing/section2.xml</name>
+			<size>181</size>
 			<commit revision="1">
 				<author>m</author>
 				<date>2013-01-04T14:33:14.600772Z</date>

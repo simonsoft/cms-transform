@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section name="section2.xml">
+	<title multiple-output="true">Second chapter</title>
+	<p multiple-output="true">The end is nigh.</p>
+</section>

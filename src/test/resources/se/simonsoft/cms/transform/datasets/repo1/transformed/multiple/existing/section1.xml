@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<section name="section1.xml">
+	<title multiple-output="true">First chapter</title>
+	<p multiple-output="true">Once upon a time...</p>
+</section>
