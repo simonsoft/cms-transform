@@ -18,6 +18,7 @@ package se.simonsoft.cms.transform.service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
 
@@ -25,6 +26,7 @@ import javax.inject.Inject;
 import javax.xml.transform.Source;
 import javax.xml.transform.stream.StreamSource;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -209,7 +211,7 @@ public class TransformServiceXsl implements TransformService {
 			
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			styleSheetItem.getContents(baos);
-			resultService = transformerServiceFactory.buildTransformerService(new StreamSource(baos.toInputStream()));
+			resultService = transformerServiceFactory.buildTransformerService(new StreamSource(IOUtils.toInputStream(baos.toString(), StandardCharsets.UTF_8)));
 		} else {
 			logger.debug("Using CMS built in stylesheet: {}", stylesheet);
 			resultService = stylesheets.get(stylesheet); 
