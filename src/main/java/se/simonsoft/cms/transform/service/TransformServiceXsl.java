@@ -255,8 +255,7 @@ public class TransformServiceXsl implements TransformService {
 		
 		CmsItemPropertiesMap m = new CmsItemPropertiesMap();
 		m.and(TRANSFORM_BASE_PROP_KEY, baseItem.getId().getLogicalId())
-		.and(TRANSFORM_NAME_PROP_KEY, config.getName()); //TODO: The item may already been transformed and a name will already exist will it be overwritten?.
-		
+		.and(TRANSFORM_NAME_PROP_KEY, config.getName());
 		return m;
 	}
 	
