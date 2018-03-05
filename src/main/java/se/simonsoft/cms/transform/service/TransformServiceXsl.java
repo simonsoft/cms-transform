@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.Set;
 
 import javax.inject.Inject;
-import javax.xml.transform.Source;
 import javax.xml.transform.stream.StreamSource;
 
 import org.apache.commons.io.IOUtils;
@@ -46,6 +45,7 @@ import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsItemNotFoundException;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
+import se.simonsoft.cms.item.properties.CmsItemPropertiesMap;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.xmlsource.handler.XmlSourceReader;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceDocumentS9api;
@@ -67,6 +67,8 @@ public class TransformServiceXsl implements TransformService {
 	private final TransformerService transformerIdentity;
 	
 	private static final String TRANSFORM_LOCK_COMMENT = "Locked for transform";
+	private static final String TRANSFORM_BASE_PROP_KEY = "abx:TransformBase";
+	private static final String TRANSFORM_NAME_PROP_KEY = "abx:TransformName";
 	private static final Logger logger = LoggerFactory.getLogger(TransformServiceXsl.class);
 
 	@Inject
@@ -94,17 +96,14 @@ public class TransformServiceXsl implements TransformService {
 
 	@Override
 	public void transform(CmsItem item, TransformConfig config) {
-		
 		if (config == null || config.getOptions() == null) {
 			throw new IllegalArgumentException("TransformServiceXsl needs a valid TransformConfig object.");
 		}
 		
 		final CmsItem base = item;
-		final CmsItemId itemId = base.getId();
-		final CmsRepository repository = itemId.getRepository();
+		final CmsItemId baseItemId = base.getId();
+		final CmsRepository repository = baseItemId.getRepository();
 		final RepoRevision baseRevision = repoLookup.getYoungest(repository);
-		
-		
 		final Boolean overwrite = new Boolean(config.getOptions().getParams().get("overwrite"));
 		
 		if (!config.getOptions().getType().equals("xsl")) {
@@ -116,26 +115,29 @@ public class TransformServiceXsl implements TransformService {
 			throw new IllegalArgumentException("Requires a valid stylesheet path or stylesheet name.");
 		}
 		
-		final CmsItemPath outputPath = getOutputPath(itemId ,config.getOptions().getParams().get("output"));
+		final CmsItemPath outputPath = getOutputPath(baseItemId ,config.getOptions().getParams().get("output"));
 		if (!pathExists(repository, outputPath)) {
 			throw new IllegalArgumentException("Specified output must be an existing folder: " + outputPath.getPath());
 		}
 		
-		final TransformerService transformerService = getTransformerService(itemId, stylesheet);
+		final TransformerService transformerService = getTransformerService(baseItemId, stylesheet);
 		if (transformerService == null) {
 			throw new IllegalArgumentException("Could not create transformerService with stylesheet: " + stylesheet);
 		}
+		
 		transformerService.setItemLookup(itemLookup);
 		
 		final CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
 		patchset.setHistoryMessage(config.getOptions().getParams().get("comment"));
 		
+		final CmsItemPropertiesMap props = getProperties(base, config);
+		
 		SaxonOutputURIResolverXdm outputURIResolver = new SaxonOutputURIResolverXdm(sourceReader);
 		TransformOptions transformOptions = new TransformOptions();
 		transformOptions.setOutputURIResolver(outputURIResolver);
 		
-		TransformStreamProvider baseStreamProvider = transformerService.getTransformStreamProvider(itemId, transformOptions);
-		addToPatchset(patchset, outputPath.append(itemId.getRelPath().getName()), baseStreamProvider, overwrite);
+		TransformStreamProvider baseStreamProvider = transformerService.getTransformStreamProvider(baseItemId, transformOptions);
+		addToPatchset(patchset, outputPath.append(baseItemId.getRelPath().getName()), baseStreamProvider, overwrite, props);
 		
 		Set<String> resultDocsHrefs = outputURIResolver.getResultDocumentHrefs();
 		for (String relpath: resultDocsHrefs) {
@@ -143,7 +145,8 @@ public class TransformServiceXsl implements TransformService {
 			TransformStreamProvider streamProvider = transformerIdentity.getTransformStreamProvider(resultDocument, null);
 			
 			CmsItemPath path = new CmsItemPath(outputPath.getPath().concat("/").concat(relpath));
-			addToPatchset(patchset, path, streamProvider, overwrite);
+			addToPatchset(patchset, path, streamProvider, overwrite, props);
+			
 		}
 		
 		commit.run(patchset);
@@ -153,38 +156,40 @@ public class TransformServiceXsl implements TransformService {
 		}
 	}
 	
-	private void addToPatchset(CmsPatchset patchset, CmsItemPath path, TransformStreamProvider streamProvider, boolean overwrite) {
+	private void addToPatchset(CmsPatchset patchset, CmsItemPath relPath, TransformStreamProvider streamProvider, boolean overwrite, CmsItemPropertiesMap properties) {
 
 		try {
 			
-			InputStream transformStream = checkStreamIsNotEmpty(streamProvider.get());
-			
-			boolean pathExists = pathExists(patchset.getRepository(), path);
+			final InputStream transformStream = checkStreamIsNotEmpty(streamProvider.get());
+			boolean pathExists = pathExists(patchset.getRepository(), relPath);
 			if (!pathExists) {
-				logger.debug("No file at path: '{}' will add new file.", path);
-				FileAdd fileAdd = new FileAdd(path, transformStream);
+				logger.debug("No file at path: '{}' will add new file.", relPath);
+				FileAdd fileAdd = new FileAdd(relPath, transformStream);
+				fileAdd.setPropertyChange(properties);
 				patchset.add(fileAdd);
 			} else if (overwrite){
-				logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", path.getPath());
-				CmsItemId itemId = new CmsItemIdArg(patchset.getRepository(), path);
+				logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", relPath.getPath());
+				CmsItemId itemId = new CmsItemIdArg(patchset.getRepository(), relPath);
 				CmsItemLockCollection locks = commit.lock(TRANSFORM_LOCK_COMMENT, patchset.getBaseRevision(), itemId.getRelPath());
 				if (locks != null && locks.getSingle() == null) {
 					throw new IllegalStateException("Unable to retrieve the lock token after locking " + itemId);
 				}
 				patchset.addLock(locks.getSingle());
-				patchset.add(new FileModificationLocked(path, transformStream));
+				FileModificationLocked fileMod = new FileModificationLocked(relPath, transformStream);
+				fileMod.setPropertyChange(properties);
+				patchset.add(fileMod);
 			} else {
 				throw new IllegalStateException("Item already exists, config prohibiting overwrite of existing items.");
 			}
-
+			
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to read stream from transform.", e);
 		} catch (EmptyStreamException e) {
-			logger.warn("Transform of item at path: '{}'  resulted in empty document, will be discarded.", path);
+			logger.warn("Transform of item at path: '{}'  resulted in empty document, will be discarded.", relPath);
 		}
 
 	}
-
+	
 	private CmsItemPath getOutputPath(CmsItemId itemId, String output) {
 		
 		CmsItemPath pathResult;
@@ -244,6 +249,15 @@ public class TransformServiceXsl implements TransformService {
 		}
 		pushbackInputStream.unread(b);
 		return pushbackInputStream;
+	}
+	
+	private CmsItemPropertiesMap getProperties(CmsItem baseItem, TransformConfig config) {
+		
+		CmsItemPropertiesMap m = new CmsItemPropertiesMap();
+		m.and(TRANSFORM_BASE_PROP_KEY, baseItem.getId().getLogicalId())
+		.and(TRANSFORM_NAME_PROP_KEY, config.getName()); //TODO: The item may already been transformed and a name will already exist will it be overwritten?.
+		
+		return m;
 	}
 	
 	private class EmptyStreamException extends Exception {
