@@ -31,11 +31,12 @@ import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.transform.service.TransformService;
 
 public class TransformItemChangedEventListener implements ItemChangedEventListener {
-	
+
 	private final TransformConfiguration transformConfiguration;
 	private final Map<CmsRepository, TransformService> transformServices;
-	
-	
+
+	private static final String TRANSFORM_BASE_PROP_KEY = "abx:TransformBase";
+
 	private static final Logger logger = LoggerFactory.getLogger(TransformItemChangedEventListener.class);
 
 	@Inject
@@ -43,27 +44,32 @@ public class TransformItemChangedEventListener implements ItemChangedEventListen
 			TransformConfiguration transformConfiguration,
 			Map<CmsRepository, TransformService> transformServices
 			) {
-		
+
 		this.transformConfiguration = transformConfiguration;
 		this.transformServices = transformServices;
-	
 	}
 
 	@Override
 	public void onItemChange(CmsItem item) {
-		
-		final TransformService transformService = transformServices.get(item.getId().getRepository());
+
+		CmsRepository repo = item.getId().getRepository();
+		final TransformService transformService = transformServices.get(repo);
 		final Map<String, TransformConfig> configurations = transformConfiguration.getConfiguration(item.getId());
-		
+
+		String v = item.getProperties().getString(TRANSFORM_BASE_PROP_KEY);
+		if (v != null) {
+			logger.debug("Item: '{}' has already been transformed.", item.getId());
+			return;
+		}
+
 		for (Entry<String, TransformConfig> e: configurations.entrySet()) {
 			if (e.getValue().isActive()) {
 				logger.debug("Config: '{}' is active, transforming...", e.getKey());
+				e.getValue().setName(e.getKey());
 				transformService.transform(item, e.getValue());
-				String stylesheet = e.getValue().getOptions().getParams().get("stylesheet");
-				logger.debug("ItemId: {}, has been transformed with stylesheet: '{}'", item.getId(), stylesheet);
+				logger.debug("Transformed with config: '{}'", e.getKey());
 			}
 		}
-		
 	}
 
 }
