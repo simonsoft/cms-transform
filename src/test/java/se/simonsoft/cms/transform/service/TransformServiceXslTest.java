@@ -41,6 +41,7 @@ import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
+import se.simonsoft.cms.item.properties.CmsItemProperties;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.transform.config.databind.TransformConfigOptions;
 import se.simonsoft.cms.transform.testconfig.TestFileXmlSetUp;
@@ -191,7 +192,7 @@ public class TransformServiceXslTest {
 
 	@Test
 	public void testSingleOutputFolderExists() throws Exception {
-		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
+		CmsItemId itemId = new CmsItemIdArg(transformTestDoc).withPegRev(1L);
 		CmsItem item = lookup.getItem(itemId);
 
 		TransformConfig config = new TransformConfig();
@@ -217,6 +218,10 @@ public class TransformServiceXslTest {
 		
 		CmsItemId itemIdNew = new CmsItemIdArg(repo, new CmsItemPath(optionsParams.get("output")).append(itemId.getRelPath().getName()));
 		CmsItem itemNew = lookup.getItem(itemIdNew);
+		
+		CmsItemProperties properties = itemNew.getProperties();
+		assertEquals(itemId.getLogicalId(), properties.getString("abx:TransformBase"));
+		
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		itemNew.getContents(baos);
 
@@ -281,6 +286,9 @@ public class TransformServiceXslTest {
 		
 		CmsItemId sec1Id = new CmsItemIdArg(repo, new CmsItemPath(itemId.getRelPath().getParent().getPath().concat("/sections/section1.xml")));
 		CmsItem sec1Item = lookup.getItem(sec1Id);
+		
+		assertEquals(itemId.getLogicalId(), sec1Item.getProperties().getString("abx:TransformBase"));
+		
 		ByteArrayOutputStream baos1 = new ByteArrayOutputStream();
 		sec1Item.getContents(baos1);
 
@@ -290,6 +298,9 @@ public class TransformServiceXslTest {
 		
 		CmsItemId sec2Id = new CmsItemIdArg(repo, new CmsItemPath(itemId.getRelPath().getParent().getPath().concat("/sections/section2.xml")));
 		CmsItem sec2Item = lookup.getItem(sec2Id);
+		
+		assertEquals(itemId.getLogicalId(), sec2Item.getProperties().getString("abx:TransformBase"));
+		
 		ByteArrayOutputStream baos2 = new ByteArrayOutputStream();
 		sec2Item.getContents(baos2);
 
