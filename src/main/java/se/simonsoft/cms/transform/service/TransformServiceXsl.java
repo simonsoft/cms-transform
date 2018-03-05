@@ -150,10 +150,6 @@ public class TransformServiceXsl implements TransformService {
 		}
 		
 		commit.run(patchset);
-		
-		for (CmsItemLock l: patchset.getLocks()) {	
-			commit.unlock(l);
-		}
 	}
 	
 	private void addToPatchset(CmsPatchset patchset, CmsItemPath relPath, TransformStreamProvider streamProvider, boolean overwrite, CmsItemPropertiesMap properties) {
