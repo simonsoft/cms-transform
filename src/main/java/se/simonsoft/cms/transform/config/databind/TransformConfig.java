@@ -15,10 +15,14 @@
  */
 package se.simonsoft.cms.transform.config.databind;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties("name")
 public class TransformConfig {
 	
 	private boolean active;
 	private TransformConfigOptions options;
+	public String name;
 	
 	public boolean isActive() {
 		return active;
@@ -36,5 +40,12 @@ public class TransformConfig {
 		this.options = options;
 	}
 
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
 	
 }

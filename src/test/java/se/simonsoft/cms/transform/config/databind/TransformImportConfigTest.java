@@ -15,9 +15,7 @@
  */
 package se.simonsoft.cms.transform.config.databind;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
@@ -101,6 +99,66 @@ public class TransformImportConfigTest {
 		assertTrue(configStr.contains("\"comments\":\"import an external file\""));
 		
 	}
+	
+	@Test
+	public void testDeserializeConfigWithNameField() throws Exception {
+		
+		
+		String configStr = "{\n" + 
+				"	\"active\": true,\n" + 
+				"	\"name\": \"testname\",\n" + 
+				"	\"options\": {\n" + 
+				"		\"type\": \"xsl\",\n" + 
+				"		\"params\": {\n" + 
+				"			\"stylesheet\": \"/dita/xsl/import.xsl\"\n" + 
+				"		}\n" + 
+				"	}\n" + 
+				"}";
+		System.out.println(configStr);
+		
+		TransformConfig config = reader.readValue(configStr);
+		
+		assertEquals(config.isActive(), true);
+		assertNull("Should not deserialize the name field", config.getName());
+		TransformConfigOptions options = config.getOptions();
+		assertNotNull(options);
+		assertEquals("xsl", options.getType());
+		
+		
+	}
+	
+	@Test
+	public void testSerializeConfigWithNameField() throws Exception {
+		
+		TransformConfig config = new TransformConfig();
+		config.setActive(true);
+		config.setName("name");
+		
+		TransformConfigOptions options = new TransformConfigOptions();
+		options.setType("xsl");
+		
+		Map<String, String> params = new HashMap<String, String>();
+		params.put("stylesheet", "/dita/xsl/import.xsl");
+		params.put("output", "/dita/import");
+		params.put("overwrite", "true");
+		params.put("comments", "import an external file");
+		
+		options.setParams(params);
+		config.setOptions(options);
+		
+		String configStr = writer.writeValueAsString(config);
+		assertFalse("Should not deserialize the name field", configStr.contains("\"name\":name"));
+		assertTrue(configStr.contains("\"active\":true"));
+		assertTrue(configStr.contains("\"options\""));
+		assertTrue(configStr.contains("\"type\":\"xsl\""));
+		assertTrue(configStr.contains("\"params\""));
+		assertTrue(configStr.contains("\"overwrite\":\"true\""));
+		assertTrue(configStr.contains("\"stylesheet\":\"/dita/xsl/import.xsl\""));
+		assertTrue(configStr.contains("\"output\":\"/dita/import\""));
+		assertTrue(configStr.contains("\"comments\":\"import an external file\""));
+		
+	}
+	
 	
 	private String getConfigStr(String path) throws FileNotFoundException, IOException {
 		InputStream resourceAsStream = this.getClass().getClassLoader().getResourceAsStream(path);
