@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 
@@ -141,12 +143,15 @@ public class TransformServiceXsl implements TransformService {
 		
 		Set<String> resultDocsHrefs = outputURIResolver.getResultDocumentHrefs();
 		for (String relpath: resultDocsHrefs) {
+			if (relpath.startsWith("/")) {
+				throw new IllegalArgumentException("Relative href must not start with slash: " + relpath);
+			}
+			
 			XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(relpath);
 			TransformStreamProvider streamProvider = transformerIdentity.getTransformStreamProvider(resultDocument, null);
 			
-			CmsItemPath path = new CmsItemPath(outputPath.getPath().concat("/").concat(relpath));
+			CmsItemPath path = outputPath.append(Arrays.asList(relpath.split("/")));
 			addToPatchset(patchset, path, streamProvider, overwrite, props);
-			
 		}
 		
 		commit.run(patchset);
