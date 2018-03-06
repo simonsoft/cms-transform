@@ -171,7 +171,7 @@ public class TransformServiceXsl implements TransformService {
 				addFolderExists(patchset, relPath.getParent());
 			} else if (overwrite){
 				logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", relPath.getPath());
-				CmsItemId itemId = new CmsItemIdArg(patchset.getRepository(), relPath);
+				CmsItemId itemId = patchset.getRepository().getItemId().withRelPath(relPath);
 				CmsItemLockCollection locks = commit.lock(TRANSFORM_LOCK_COMMENT, patchset.getBaseRevision(), itemId.getRelPath());
 				if (locks != null && locks.getSingle() == null) {
 					throw new IllegalStateException("Unable to retrieve the lock token after locking " + itemId);
@@ -196,10 +196,10 @@ public class TransformServiceXsl implements TransformService {
 		CmsItemPath pathResult;
 		
 		if (output == null || output.trim().isEmpty()) {
-			pathResult = new CmsItemIdArg(itemId.getRepository(), itemId.getRelPath().getParent()).getRelPath();
+			pathResult = itemId.getRepository().getItemId().withRelPath(itemId.getRelPath().getParent()).getRelPath();
 			logger.debug("Output folder is not specified will default to items parent folder.");
 		} else {
-			pathResult = new CmsItemIdArg(itemId.getRepository(), new CmsItemPath(output)).getRelPath();
+			pathResult = itemId.getRepository().getItemId().withRelPath(new CmsItemPath(output)).getRelPath();
 			logger.debug("Output folder is specified: {}", output);
 		}
 		
@@ -211,7 +211,7 @@ public class TransformServiceXsl implements TransformService {
 		TransformerService resultService;
 		
 		if (stylesheet.startsWith("/")) {
-			CmsItemId styleSheetItemId = new CmsItemIdArg(itemId.getRepository(), new CmsItemPath(stylesheet));
+			CmsItemId styleSheetItemId = itemId.getRepository().getItemId().withRelPath(new CmsItemPath(stylesheet));
 			logger.debug("Using stylesheet from CMS: {}", styleSheetItemId.getLogicalId());
 			CmsItem styleSheetItem = itemLookup.getItem(styleSheetItemId);
 			
@@ -228,7 +228,7 @@ public class TransformServiceXsl implements TransformService {
 	
 	private boolean pathExists(CmsRepository repo, CmsItemPath path) {
 		
-		CmsItemId itemIdOutput = new CmsItemIdArg(repo, path);
+		CmsItemId itemIdOutput = repo.getItemId().withRelPath(path);
 		boolean result = false;
 		
 		try {
