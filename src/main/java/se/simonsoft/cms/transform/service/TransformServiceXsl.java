@@ -80,7 +80,7 @@ public class TransformServiceXsl implements TransformService {
 			CmsRepositoryLookup lookupRepo,
 			TransformerServiceFactory transfromerServiceFactory,
 			Map<String, TransformerService> stylesheets,
-			XmlSourceReader sourceReader
+			XmlSourceReaderS9api sourceReader
 			) {
 		
 		this.commit = commit;
@@ -89,11 +89,7 @@ public class TransformServiceXsl implements TransformService {
 		this.transformerServiceFactory = transfromerServiceFactory;
 		this.transformerIdentity = transfromerServiceFactory.buildTransformerService(new StreamSource(this.getClass().getClassLoader().getResourceAsStream("se/simonsoft/cms/xmlsource/transform/identity.xsl")));
 		this.stylesheets = stylesheets;
-		if (sourceReader instanceof XmlSourceReaderS9api) {
-			this.sourceReader = (XmlSourceReaderS9api) sourceReader;
-		} else {
-			throw new IllegalArgumentException("TransformServiceXsl requires Saxon S9API impl of XmlSourceReader, got: " + sourceReader.getClass());
-		}
+		this.sourceReader = sourceReader;
 	}
 
 	@Override

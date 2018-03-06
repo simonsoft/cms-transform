@@ -45,7 +45,7 @@ import se.simonsoft.cms.item.properties.CmsItemProperties;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.transform.config.databind.TransformConfigOptions;
 import se.simonsoft.cms.transform.testconfig.TestFileXmlSetUp;
-import se.simonsoft.cms.xmlsource.handler.XmlSourceReader;
+import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceReaderS9api;
 import se.simonsoft.cms.xmlsource.transform.TransformerService;
 import se.simonsoft.cms.xmlsource.transform.TransformerServiceFactory;
 
@@ -79,7 +79,7 @@ public class TransformServiceXslTest {
 		lookup = indexing.getContext().getInstance(CmsItemLookup.class);
 		repoLookup = indexing.getContext().getInstance(CmsRepositoryLookup.class);
 		TransformerServiceFactory transformerServiceFactory = indexing.getContext().getInstance(TransformerServiceFactory.class);
-		XmlSourceReader sourceReader = indexing.getContext().getInstance(XmlSourceReader.class);
+		XmlSourceReaderS9api sourceReader = indexing.getContext().getInstance(XmlSourceReaderS9api.class);
 		
 		Map<String, TransformerService> services = new HashMap<>();
 		StreamSource streamSourceMulti = new StreamSource(this.getClass().getClassLoader().getResourceAsStream("se/simonsoft/cms/transform/datasets/repo1/stylesheet/transform-multiple-output.xsl"));
