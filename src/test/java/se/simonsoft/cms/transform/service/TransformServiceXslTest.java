@@ -482,7 +482,15 @@ public class TransformServiceXslTest {
 		try {
 			transformService.transform(item, config);
 		} catch (IllegalArgumentException e) {
-			assertEquals("Could not create transformerService with stylesheet: non-existing.xsl", e.getMessage());
+			assertEquals("Could not find precompiled transformerService with stylesheet name: non-existing.xsl", e.getMessage());
+		}
+		
+		optionsParams.put("stylesheet", "/non/existing.xsl");
+		
+		try {
+			transformService.transform(item, config);
+		} catch (IllegalArgumentException e) {
+			assertEquals("Specified stylesheet do not exist at path: /non/existing.xsl", e.getMessage());
 		}
 	}
 	

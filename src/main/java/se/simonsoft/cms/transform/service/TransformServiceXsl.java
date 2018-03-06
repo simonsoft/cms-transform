@@ -123,9 +123,6 @@ public class TransformServiceXsl implements TransformService {
 		}
 		
 		final TransformerService transformerService = getTransformerService(baseItemId, stylesheet);
-		if (transformerService == null) {
-			throw new IllegalArgumentException("Could not create transformerService with stylesheet: " + stylesheet);
-		}
 		
 		transformerService.setItemLookup(itemLookup);
 		
@@ -212,7 +209,12 @@ public class TransformServiceXsl implements TransformService {
 		if (stylesheet.startsWith("/")) {
 			CmsItemId styleSheetItemId = itemId.getRepository().getItemId().withRelPath(new CmsItemPath(stylesheet));
 			logger.debug("Using stylesheet from CMS: {}", styleSheetItemId.getLogicalId());
-			CmsItem styleSheetItem = itemLookup.getItem(styleSheetItemId);
+			CmsItem styleSheetItem;
+			try {
+				 styleSheetItem = itemLookup.getItem(styleSheetItemId);
+			} catch (CmsItemNotFoundException e) {
+				throw new IllegalArgumentException("Specified stylesheet do not exist at path: " + stylesheet, e);
+			}
 			
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			styleSheetItem.getContents(baos);
@@ -220,6 +222,9 @@ public class TransformServiceXsl implements TransformService {
 		} else {
 			logger.debug("Using CMS built in stylesheet: {}", stylesheet);
 			resultService = stylesheets.get(stylesheet); 
+			if (resultService == null) {
+				throw new IllegalArgumentException("Could not find precompiled transformerService with stylesheet name: " + stylesheet);
+			}
 		}
 		
 		return resultService;
