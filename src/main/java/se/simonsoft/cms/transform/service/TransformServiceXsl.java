@@ -161,7 +161,7 @@ public class TransformServiceXsl implements TransformService {
 	private void addToPatchset(CmsPatchset patchset, CmsItemPath relPath, TransformStreamProvider streamProvider, boolean overwrite, CmsItemPropertiesMap properties) {
 		try {
 			
-			final InputStream transformStream = checkStreamIsNotEmpty(streamProvider.get());
+			final InputStream transformStream = getInputStreamNotEmpty(streamProvider.get());
 			boolean pathExists = pathExists(patchset.getRepository(), relPath);
 			if (!pathExists) {
 				logger.debug("No file at path: '{}' will add new file.", relPath);
@@ -241,7 +241,7 @@ public class TransformServiceXsl implements TransformService {
 		return result;
 	}
 	
-	private InputStream checkStreamIsNotEmpty(InputStream inputStream) throws IOException, EmptyStreamException {
+	private InputStream getInputStreamNotEmpty(InputStream inputStream) throws IOException, EmptyStreamException {
 		PushbackInputStream pushbackInputStream = new PushbackInputStream(inputStream);
 		int b;
 		b = pushbackInputStream.read();
