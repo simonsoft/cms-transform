@@ -86,7 +86,7 @@ public class TransformConfigurationDefault implements TransformConfiguration {
 					TransformConfig config = reader.readValue(o.getValueString());
 					configs.put(o.getKey(), config);
 				} catch (IOException e) {
-					logger.error("Could not deserialize config: {} to new TransformImportConfiguration", name.concat(":" + o.getKey()));
+					logger.error("Could not deserialize config: {} to new TransformConfiguration", name.concat(":" + o.getKey()));
 					throw new RuntimeException(e);
 				}
 			}
