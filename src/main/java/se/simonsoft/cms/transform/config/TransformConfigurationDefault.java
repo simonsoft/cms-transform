@@ -57,7 +57,7 @@ public class TransformConfigurationDefault implements TransformConfiguration {
 	public Map<String, TransformConfig> getConfiguration(CmsItemId itemId) {
 		
 		if (itemId == null) {
-			throw new IllegalArgumentException("Getting configurations requiers a valid CmsItemId");
+			throw new IllegalArgumentException("Getting configurations requires a valid CmsItemId");
 		}
 		
 		CmsResourceContext context = getConfigurationParentFolder(itemId);
