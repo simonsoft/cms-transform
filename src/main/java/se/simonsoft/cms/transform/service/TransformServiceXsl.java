@@ -172,7 +172,7 @@ public class TransformServiceXsl implements TransformService {
 				FileAdd fileAdd = new FileAdd(relPath, transformStream);
 				fileAdd.setPropertyChange(properties);
 				patchset.add(fileAdd);
-				addFolderExists(patchset, relPath);
+				addFolderExists(patchset, relPath.getParent());
 			} else if (overwrite){
 				logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", relPath.getPath());
 				CmsItemId itemId = new CmsItemIdArg(patchset.getRepository(), relPath);
@@ -264,18 +264,18 @@ public class TransformServiceXsl implements TransformService {
 		return m;
 	}
 	
-	private void addFolderExists(CmsPatchset p, CmsItemPath path) {
-		Iterator<CmsPatchItem> iterator = p.iterator();
+	private void addFolderExists(CmsPatchset patchset, CmsItemPath parentPath) {
+		Iterator<CmsPatchItem> iterator = patchset.iterator();
 		boolean addFolderExist = true;
 		while (iterator.hasNext() && addFolderExist) {
 			CmsPatchItem next = iterator.next();
-			if (next instanceof FolderExist && next.getPath().compareTo(path.getParent()) == 0) {
+			if (next instanceof FolderExist && next.getPath().compareTo(parentPath) == 0) {
 				addFolderExist = false;
 			}
 		}
 
 		if (addFolderExist) {
-			p.add(new FolderExist(path.getParent()));
+			patchset.add(new FolderExist(parentPath));
 
 		}
 	}
