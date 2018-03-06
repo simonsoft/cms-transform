@@ -21,6 +21,8 @@ import java.io.PushbackInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
@@ -32,6 +34,7 @@ import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import se.simonsoft.cms.backend.svnkit.commit.handlers.FileAddHandler;
 import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
 import se.simonsoft.cms.item.CmsItemLock;
@@ -40,9 +43,11 @@ import se.simonsoft.cms.item.CmsItemPath;
 import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.RepoRevision;
 import se.simonsoft.cms.item.commit.CmsCommit;
+import se.simonsoft.cms.item.commit.CmsPatchItem;
 import se.simonsoft.cms.item.commit.CmsPatchset;
 import se.simonsoft.cms.item.commit.FileAdd;
 import se.simonsoft.cms.item.commit.FileModificationLocked;
+import se.simonsoft.cms.item.commit.FolderExist;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsItemNotFoundException;
@@ -158,7 +163,6 @@ public class TransformServiceXsl implements TransformService {
 	}
 	
 	private void addToPatchset(CmsPatchset patchset, CmsItemPath relPath, TransformStreamProvider streamProvider, boolean overwrite, CmsItemPropertiesMap properties) {
-
 		try {
 			
 			final InputStream transformStream = checkStreamIsNotEmpty(streamProvider.get());
@@ -168,6 +172,7 @@ public class TransformServiceXsl implements TransformService {
 				FileAdd fileAdd = new FileAdd(relPath, transformStream);
 				fileAdd.setPropertyChange(properties);
 				patchset.add(fileAdd);
+				addFolderExists(patchset, relPath);
 			} else if (overwrite){
 				logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", relPath.getPath());
 				CmsItemId itemId = new CmsItemIdArg(patchset.getRepository(), relPath);
@@ -188,7 +193,6 @@ public class TransformServiceXsl implements TransformService {
 		} catch (EmptyStreamException e) {
 			logger.warn("Transform of item at path: '{}'  resulted in empty document, will be discarded.", relPath);
 		}
-
 	}
 	
 	private CmsItemPath getOutputPath(CmsItemId itemId, String output) {
@@ -258,6 +262,22 @@ public class TransformServiceXsl implements TransformService {
 		m.and(TRANSFORM_BASE_PROP_KEY, baseItem.getId().getLogicalId())
 		.and(TRANSFORM_NAME_PROP_KEY, config.getName());
 		return m;
+	}
+	
+	private void addFolderExists(CmsPatchset p, CmsItemPath path) {
+		Iterator<CmsPatchItem> iterator = p.iterator();
+		boolean addFolderExist = true;
+		while (iterator.hasNext() && addFolderExist) {
+			CmsPatchItem next = iterator.next();
+			if (next instanceof FolderExist && next.getPath().compareTo(path.getParent()) == 0) {
+				addFolderExist = false;
+			}
+		}
+
+		if (addFolderExist) {
+			p.add(new FolderExist(path.getParent()));
+
+		}
 	}
 	
 	private class EmptyStreamException extends Exception {
