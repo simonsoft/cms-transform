@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import se.simonsoft.cms.item.CmsItem;
+import se.simonsoft.cms.item.CmsItemKind;
 import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.events.ItemChangedEventListener;
 import se.simonsoft.cms.transform.config.TransformConfiguration;
@@ -52,13 +53,13 @@ public class TransformItemChangedEventListener implements ItemChangedEventListen
 	@Override
 	public void onItemChange(CmsItem item) {
 		
-		if (item.getKind().isFolder()) {
-			throw new IllegalArgumentException("Changed item must not be a file to be transformed: " + item.getId().getLogicalId());
-		}
-		
 		if (item.getId().getPegRev() == null) {
 			logger.error("Item requires a revision to be transformed: {}", item.getId().getLogicalId());
 			throw new IllegalArgumentException("Item requires a revision to be transformed.");
+		}
+		
+		if (item.getKind() != CmsItemKind.File) {
+			return;
 		}
 
 		CmsRepository repo = item.getId().getRepository();
