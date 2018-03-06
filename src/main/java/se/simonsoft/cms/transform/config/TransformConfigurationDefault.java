@@ -41,7 +41,7 @@ public class TransformConfigurationDefault implements TransformConfiguration {
 	private final CmsRepositoryLookup repositoryLookup;
 	private final ObjectReader reader;
 	
-	private static final String TRANSFORM_IMPORT_NAMESPACE = "cmsconfig-transform";
+	private static final String TRANSFORM_NAMESPACE = "cmsconfig-transform";
 
 	@Inject
 	public TransformConfigurationDefault(
@@ -75,13 +75,13 @@ public class TransformConfigurationDefault implements TransformConfiguration {
 	}
 
 	private Map<String, TransformConfig> deserializeConfig(CmsResourceContext context) {
-		logger.debug("Starting deserialization of configs with namespace {}...", TRANSFORM_IMPORT_NAMESPACE);
+		logger.debug("Starting deserialization of configs with namespace {}...", TRANSFORM_NAMESPACE);
 		
 		Map<String, TransformConfig> configs = new LinkedHashMap<>();
 		
 		for (CmsConfigOption o: context) {
 			final String name = o.getNamespace();
-			if (name.startsWith(TRANSFORM_IMPORT_NAMESPACE)) {
+			if (name.startsWith(TRANSFORM_NAMESPACE)) {
 				try {
 					TransformConfig config = reader.readValue(o.getValueString());
 					configs.put(o.getKey(), config);
