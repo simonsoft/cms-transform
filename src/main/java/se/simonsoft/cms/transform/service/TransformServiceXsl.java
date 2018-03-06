@@ -255,8 +255,8 @@ public class TransformServiceXsl implements TransformService {
 	private CmsItemPropertiesMap getProperties(CmsItem baseItem, TransformConfig config) {
 		
 		CmsItemPropertiesMap m = new CmsItemPropertiesMap();
-		m.and(TRANSFORM_BASE_PROP_KEY, baseItem.getId().getLogicalId())
-		.and(TRANSFORM_NAME_PROP_KEY, config.getName());
+		m.put(TRANSFORM_BASE_PROP_KEY, baseItem.getId().getLogicalId());
+		m.put(TRANSFORM_NAME_PROP_KEY, config.getName());
 		return m;
 	}
 	
