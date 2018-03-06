@@ -51,11 +51,20 @@ public class TransformItemChangedEventListener implements ItemChangedEventListen
 
 	@Override
 	public void onItemChange(CmsItem item) {
+		
+		if (item.getKind().isFolder()) {
+			throw new IllegalArgumentException("Changed item must not be a file to be transformed: " + item.getId().getLogicalId());
+		}
+		
+		if (item.getId().getPegRev() == null) {
+			logger.error("Item requires a revision to be transformed: {}", item.getId().getLogicalId());
+			throw new IllegalArgumentException("Item requires a revision to be transformed.");
+		}
 
 		CmsRepository repo = item.getId().getRepository();
 		final TransformService transformService = transformServices.get(repo);
 		final Map<String, TransformConfig> configurations = transformConfiguration.getConfiguration(item.getId());
-
+		
 		String v = item.getProperties().getString(TRANSFORM_BASE_PROP_KEY);
 		if (v != null) {
 			logger.debug("Item: '{}' has already been transformed.", item.getId());
