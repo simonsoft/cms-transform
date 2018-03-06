@@ -39,7 +39,7 @@ import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 
-public class TransformImportConfigurationDefaultTest {
+public class TransformConfigurationDefaultTest {
 	
 	private CmsItemId itemId = new CmsItemIdArg("x-svn:///svn/demo1^/test/path/some.xml");
 	private static final String TRANSFORM_IMPORT_CONFIG = "cmsconfig-transform:import";
