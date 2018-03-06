@@ -15,6 +15,8 @@
  */
 package se.simonsoft.cms.transform.service;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
@@ -27,8 +29,6 @@ import java.util.Set;
 import javax.inject.Inject;
 import javax.xml.transform.stream.StreamSource;
 
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +44,6 @@ import se.simonsoft.cms.item.commit.CmsPatchset;
 import se.simonsoft.cms.item.commit.FileAdd;
 import se.simonsoft.cms.item.commit.FileModificationLocked;
 import se.simonsoft.cms.item.commit.FolderExist;
-import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsItemNotFoundException;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
@@ -217,7 +216,7 @@ public class TransformServiceXsl implements TransformService {
 			
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			styleSheetItem.getContents(baos);
-			resultService = transformerServiceFactory.buildTransformerService(new StreamSource(IOUtils.toInputStream(baos.toString(StandardCharsets.UTF_8), StandardCharsets.UTF_8)));
+			resultService = transformerServiceFactory.buildTransformerService(new StreamSource(new ByteArrayInputStream(baos.toByteArray())));
 		} else {
 			logger.debug("Using CMS built in stylesheet: {}", stylesheet);
 			resultService = stylesheets.get(stylesheet); 
