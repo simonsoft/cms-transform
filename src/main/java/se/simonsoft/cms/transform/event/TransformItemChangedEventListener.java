@@ -68,7 +68,7 @@ public class TransformItemChangedEventListener implements ItemChangedEventListen
 		
 		String v = item.getProperties().getString(TRANSFORM_BASE_PROP_KEY);
 		if (v != null) {
-			logger.debug("Item: '{}' has already been transformed.", item.getId());
+			logger.debug("Item has already been transformed: {}", item.getId());
 			return;
 		}
 
