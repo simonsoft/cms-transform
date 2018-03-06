@@ -31,6 +31,14 @@
 				<author>m</author>
 				<date>2013-01-04T14:33:14.600772Z</date>
 			</commit>
+			<properties/>
+		</entry>
+		<entry kind="dir">
+			<name>doc</name>
+			<commit revision="1">
+				<author>test</author>
+				<date>2012-10-03T03:53:54.616837Z</date>
+			</commit>
 			<properties>
 				<property name="cmsconfig-transform:single">
 					{
@@ -46,8 +54,6 @@
 						}
 					}
 				</property>
-			</properties>
-			<properties>
 				<property name="cmsconfig-transform:multiple">
 					{
 					"active": true,
@@ -63,14 +69,6 @@
 					}
 				</property>
 			</properties>
-		</entry>
-		<entry kind="dir">
-			<name>doc</name>
-			<commit revision="1">
-				<author>test</author>
-				<date>2012-10-03T03:53:54.616837Z</date>
-			</commit>
-			<properties />
 		</entry>
 		<entry kind="dir">
 			<name>transformed</name>
