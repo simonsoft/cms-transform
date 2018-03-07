@@ -15,6 +15,7 @@
  */
 package se.simonsoft.cms.transform.service;
 
+import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -24,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Scanner;
 import java.util.Set;
 
 import javax.inject.Inject;
@@ -242,14 +244,23 @@ public class TransformServiceXsl implements TransformService {
 	}
 	
 	private InputStream getInputStreamNotEmpty(InputStream inputStream) throws IOException, EmptyStreamException {
-		PushbackInputStream pushbackInputStream = new PushbackInputStream(inputStream);
-		int b;
-		b = pushbackInputStream.read();
-		if ( b == -1 ) {
+		int maxRead = 200;
+		PushbackInputStream pushbackInputStream = new PushbackInputStream(inputStream, maxRead);
+		byte[] bytes = new byte[maxRead];
+		int len = pushbackInputStream.read(bytes, 0, maxRead);
+		String data = new String(bytes, StandardCharsets.UTF_8);
+		
+		if (len == -1 || emptyExceptDeclaration(data)) { 
 			throw new EmptyStreamException("Transform is empty");
 		}
-		pushbackInputStream.unread(b);
+		
+		byte[] copyOf = Arrays.copyOf(bytes, len); // Do not want to pushback 200 bytes if content is less.	
+		pushbackInputStream.unread(copyOf);
 		return pushbackInputStream;
+	}
+
+	private boolean emptyExceptDeclaration(String data) {
+		return data.substring(data.indexOf("?>") + 2, data.length()).trim().isEmpty();
 	}
 	
 	private CmsItemPropertiesMap getProperties(CmsItem baseItem, TransformConfig config) {
