@@ -146,7 +146,8 @@ public class TransformServiceXsl implements TransformService {
 			addToPatchset(patchset, path, streamProvider, overwrite, props);
 		}
 		
-		commit.run(patchset);
+		RepoRevision r = commit.run(patchset);
+		logger.debug("Transform complete, commited with rev: {}", r.getNumber());
 	}
 	
 	private void addToPatchset(CmsPatchset patchset, CmsItemPath relPath, TransformStreamProvider streamProvider, boolean overwrite, CmsItemPropertiesMap properties) {
