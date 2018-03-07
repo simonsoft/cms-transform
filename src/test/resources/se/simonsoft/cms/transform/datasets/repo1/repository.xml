@@ -170,5 +170,15 @@
 			<properties>
 			</properties>
 		</entry>
+		<entry kind="file">
+			<name>stylesheet/transform-no-output.xsl</name>
+			<size>811</size>
+			<commit revision="1">
+				<author>m</author>
+				<date>2013-01-04T14:33:14.600772Z</date>
+			</commit>
+			<properties>
+			</properties>
+		</entry>
 	</list>
 </lists>

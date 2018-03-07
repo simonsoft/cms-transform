@@ -15,11 +15,10 @@
  */
 package se.simonsoft.cms.transform.service;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 import java.io.ByteArrayOutputStream;
+import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
@@ -492,6 +491,43 @@ public class TransformServiceXslTest {
 		} catch (IllegalArgumentException e) {
 			assertEquals("Specified stylesheet do not exist at path: /non/existing.xsl", e.getMessage());
 		}
+	}
+	
+	@Test
+	public void testEmptyTransformWillBeDiscarded() throws UnsupportedEncodingException {
+		
+		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
+		CmsItem item = lookup.getItem(itemId);
+		
+		ByteArrayOutputStream baos1 = new ByteArrayOutputStream();
+		item.getContents(baos1);
+
+		String stringOrignalItem = baos1.toString(StandardCharsets.UTF_8.name());
+		
+		TransformConfig config = new TransformConfig();
+		config.setActive(true);
+
+		TransformConfigOptions configOptions = new TransformConfigOptions();
+		configOptions.setType("xsl");
+
+		Map<String, String> optionsParams = new HashMap<String, String>();
+		optionsParams.put("stylesheet", "/stylesheet/transform-no-output.xsl");
+		optionsParams.put("overwrite", "true");
+		optionsParams.put("comment", "Automatic transform!");
+		configOptions.setParams(optionsParams);
+
+		config.setOptions(configOptions);
+		
+		transformService.transform(item, config);
+		CmsItem itemNew = lookup.getItem(itemId);
+		
+		ByteArrayOutputStream baos2 = new ByteArrayOutputStream();
+		itemNew.getContents(baos2);
+
+		String stringNewContent = baos2.toString(StandardCharsets.UTF_8.name());
+		
+		assertEquals(stringOrignalItem, stringNewContent);
+		
 	}
 	
 	@Test
