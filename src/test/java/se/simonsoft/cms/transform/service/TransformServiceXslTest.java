@@ -15,7 +15,9 @@
  */
 package se.simonsoft.cms.transform.service;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
@@ -23,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.xml.transform.Source;
 import javax.xml.transform.stream.StreamSource;
 
 import org.junit.After;
@@ -45,7 +48,6 @@ import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.transform.config.databind.TransformConfigOptions;
 import se.simonsoft.cms.transform.testconfig.TestFileXmlSetUp;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceReaderS9api;
-import se.simonsoft.cms.xmlsource.transform.TransformerService;
 import se.simonsoft.cms.xmlsource.transform.TransformerServiceFactory;
 
 public class TransformServiceXslTest {
@@ -80,12 +82,12 @@ public class TransformServiceXslTest {
 		TransformerServiceFactory transformerServiceFactory = indexing.getContext().getInstance(TransformerServiceFactory.class);
 		XmlSourceReaderS9api sourceReader = indexing.getContext().getInstance(XmlSourceReaderS9api.class);
 		
-		Map<String, TransformerService> services = new HashMap<>();
+		Map<String, Source> services = new HashMap<>();
 		StreamSource streamSourceMulti = new StreamSource(this.getClass().getClassLoader().getResourceAsStream("se/simonsoft/cms/transform/datasets/repo1/stylesheet/transform-multiple-output.xsl"));
 		StreamSource streamSourceSingle = new StreamSource(this.getClass().getClassLoader().getResourceAsStream("se/simonsoft/cms/transform/datasets/repo1/stylesheet/transform-single-output.xsl"));
 		
-		services.put("transform-multiple-output.xsl", transformerServiceFactory.buildTransformerService(streamSourceMulti));
-		services.put("transform-single-output.xsl", transformerServiceFactory.buildTransformerService(streamSourceSingle));
+		services.put("transform-multiple-output.xsl", streamSourceMulti);
+		services.put("transform-single-output.xsl", streamSourceSingle);
 		
 		transformService = new TransformServiceXsl(commit, lookup, repoLookup, transformerServiceFactory, services, sourceReader); // may exist a injected version. 
 	}
@@ -481,7 +483,7 @@ public class TransformServiceXslTest {
 		try {
 			transformService.transform(item, config);
 		} catch (IllegalArgumentException e) {
-			assertEquals("Could not find precompiled transformerService with stylesheet name: non-existing.xsl", e.getMessage());
+			assertEquals("Could not find source with stylesheet name: non-existing.xsl", e.getMessage());
 		}
 		
 		optionsParams.put("stylesheet", "/non/existing.xsl");
@@ -518,7 +520,12 @@ public class TransformServiceXslTest {
 
 		config.setOptions(configOptions);
 		
-		transformService.transform(item, config);
+		try {
+			transformService.transform(item, config);
+			fail("Should result in empty changeset and backend-filexml will not accept that.");
+		} catch (IllegalArgumentException e) {
+			assertEquals("Filexml backend does not support empty changeset (patchset resulted in empty changeset).", e.getMessage());
+		}
 		CmsItem itemNew = lookup.getItem(itemId);
 		
 		ByteArrayOutputStream baos2 = new ByteArrayOutputStream();

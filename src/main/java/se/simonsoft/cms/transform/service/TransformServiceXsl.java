@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 
 import javax.inject.Inject;
+import javax.xml.transform.Source;
 import javax.xml.transform.stream.StreamSource;
 
 import org.slf4j.Logger;
@@ -63,7 +64,7 @@ public class TransformServiceXsl implements TransformService {
 	private final CmsItemLookup itemLookup;
 	private final TransformerServiceFactory transformerServiceFactory;
 	private final CmsRepositoryLookup repoLookup;
-	private final Map<String, TransformerService> stylesheets;
+	private final Map<String, Source> stylesheets;
 	private final XmlSourceReaderS9api sourceReader;
 	private final TransformerService transformerIdentity;
 	
@@ -78,7 +79,7 @@ public class TransformServiceXsl implements TransformService {
 			CmsItemLookup itemLookup,
 			CmsRepositoryLookup lookupRepo,
 			TransformerServiceFactory transfromerServiceFactory,
-			Map<String, TransformerService> stylesheets,
+			Map<String, Source> stylesheets,
 			XmlSourceReaderS9api sourceReader
 			) {
 		
@@ -217,10 +218,11 @@ public class TransformServiceXsl implements TransformService {
 			resultService = transformerServiceFactory.buildTransformerService(new StreamSource(new ByteArrayInputStream(baos.toByteArray())));
 		} else {
 			logger.debug("Using CMS built in stylesheet: {}", stylesheet);
-			resultService = stylesheets.get(stylesheet); 
-			if (resultService == null) {
-				throw new IllegalArgumentException("Could not find precompiled transformerService with stylesheet name: " + stylesheet);
+			Source source = stylesheets.get(stylesheet);
+			if (source == null) {
+				throw new IllegalArgumentException("Could not find source with stylesheet name: " + stylesheet);
 			}
+			resultService = transformerServiceFactory.buildTransformerService(source); 
 		}
 		
 		return resultService;
