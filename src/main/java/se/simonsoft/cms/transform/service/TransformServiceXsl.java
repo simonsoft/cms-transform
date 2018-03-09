@@ -157,11 +157,11 @@ public class TransformServiceXsl implements TransformService {
 			final InputStream transformStream = getInputStreamNotEmpty(streamProvider.get());
 			boolean pathExists = pathExists(patchset.getRepository(), relPath);
 			if (!pathExists) {
+				addFolderExists(patchset, relPath.getParent());
 				logger.debug("No file at path: '{}' will add new file.", relPath);
 				FileAdd fileAdd = new FileAdd(relPath, transformStream);
 				fileAdd.setPropertyChange(properties);
 				patchset.add(fileAdd);
-				addFolderExists(patchset, relPath.getParent());
 			} else if (overwrite){
 				logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", relPath.getPath());
 				CmsItemId itemId = patchset.getRepository().getItemId().withRelPath(relPath);
