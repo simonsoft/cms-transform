@@ -73,7 +73,7 @@
 		<dependency>
 			<groupId>se.repos</groupId>
 			<artifactId>repos-indexing-standalone</artifactId>
-			<version>1.2.3-SNAPSHOT</version>
+			<version>1.2.4-SNAPSHOT</version>
 			<scope>test</scope>
 		</dependency>
 		
