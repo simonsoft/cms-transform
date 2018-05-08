@@ -52,7 +52,7 @@ public class TransformItemChangedEventListener implements ItemChangedEventListen
 
 	@Override
 	public void onItemChange(CmsItem item) {
-		
+		logger.debug("Item change event with id: {}", item.getId());
 		if (item.getId().getPegRev() == null) {
 			logger.error("Item requires a revision to be transformed: {}", item.getId().getLogicalId());
 			throw new IllegalArgumentException("Item requires a revision to be transformed.");
