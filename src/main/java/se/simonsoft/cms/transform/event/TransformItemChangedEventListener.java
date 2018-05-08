@@ -72,12 +72,18 @@ public class TransformItemChangedEventListener implements ItemChangedEventListen
 			return;
 		}
 
-		for (Entry<String, TransformConfig> e: configurations.entrySet()) {
-			if (e.getValue().isActive()) {
-				logger.debug("Config: '{}' is active, transforming...", e.getKey());
-				e.getValue().setName(e.getKey());
-				transformService.transform(item, e.getValue());
-				logger.debug("Transformed with config: '{}'", e.getKey());
+		for (Entry<String, TransformConfig> config: configurations.entrySet()) {
+			if (config.getValue().isActive()) {
+				logger.debug("Config: '{}' is active, transforming...", config.getKey());
+				config.getValue().setName(config.getKey());
+				try {
+					transformService.transform(item, config.getValue());
+					logger.debug("Transformed with config: '{}'", config.getKey());
+				} catch (Exception e) {
+					logger.error("Failed transform '{}': {}", config.getKey(), e.getMessage(), e);
+					// Best effort, for now.
+					// Could consider storing the exception and throwing outside the loop in order to trigger a retry.
+				}
 			}
 		}
 	}
