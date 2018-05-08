@@ -66,9 +66,9 @@ public class TransformItemChangedEventListener implements ItemChangedEventListen
 		final TransformService transformService = transformServices.get(repo);
 		final Map<String, TransformConfig> configurations = transformConfiguration.getConfiguration(item.getId());
 		
-		String v = item.getProperties().getString(TRANSFORM_BASE_PROP_KEY);
-		if (v != null) {
-			logger.debug("Item has already been transformed: {}", item.getId());
+
+		if (!configurations.isEmpty() && item.getProperties().getString(TRANSFORM_BASE_PROP_KEY) != null) {
+			logger.debug("Item is the result of a transform, suppressing: {}", item.getId());
 			return;
 		}
 
