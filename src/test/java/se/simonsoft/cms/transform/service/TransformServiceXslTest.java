@@ -491,7 +491,7 @@ public class TransformServiceXslTest {
 		try {
 			transformService.transform(item, config);
 		} catch (IllegalArgumentException e) {
-			assertEquals("Specified stylesheet do not exist at path: /non/existing.xsl", e.getMessage());
+			assertEquals("Specified stylesheet does not exist at path: /non/existing.xsl", e.getMessage());
 		}
 	}
 	
