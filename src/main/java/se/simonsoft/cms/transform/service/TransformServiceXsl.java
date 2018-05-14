@@ -205,12 +205,13 @@ public class TransformServiceXsl implements TransformService {
 		
 		if (stylesheet.startsWith("/")) {
 			CmsItemId styleSheetItemId = itemId.getRepository().getItemId().withRelPath(new CmsItemPath(stylesheet));
-			logger.debug("Using stylesheet from CMS: {}", styleSheetItemId.getLogicalId());
+			logger.debug("Using stylesheet from repo: {}", styleSheetItemId.getLogicalId());
 			CmsItem styleSheetItem;
 			try {
 				 styleSheetItem = itemLookup.getItem(styleSheetItemId);
+				 logger.debug("Using stylesheet from repo: {} {}", styleSheetItemId.getLogicalId(), styleSheetItem.getRevisionChanged());
 			} catch (CmsItemNotFoundException e) {
-				throw new IllegalArgumentException("Specified stylesheet do not exist at path: " + stylesheet, e);
+				throw new IllegalArgumentException("Specified stylesheet does not exist at path: " + stylesheet, e);
 			}
 			
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
