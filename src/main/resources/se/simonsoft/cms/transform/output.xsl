@@ -20,7 +20,6 @@
 	
 	<xsl:template match="/">
 		<!-- For completeness: If this template was called from the document node, ensure that nothing is output before result-document. -->
-		<!-- The Prepare Release service performs this transform with the document root element as initial context. -->
 		<xsl:apply-templates select="element()"/>
 	</xsl:template>
 	
@@ -35,7 +34,6 @@
 			</xsl:if>
 		</xsl:variable>
 		
-		<xsl:message select="concat('output.xsl: ',$doctype.public)"></xsl:message>
 		<!-- Using 'xml' output method will preserve minimized empty tags from input. Actually, 'xml' will minimize all tags that happen to be empty. -->
 		<xsl:result-document method="xml" doctype-public="{$doctype.public}" doctype-system="{$doctype.system}" omit-xml-declaration="{$omit-xml-declaration}">
 			<!-- A DOCTYPE declaration will be output by Saxon if a doctype-system is present. -->
@@ -44,8 +42,8 @@
 	</xsl:template>
 	
 	<xsl:template match="@cms:doctype-public | @cms:doctype-system" mode="output">
-		<!-- Suppressing temporary attributes from URI-resolver. -->
-		<!-- This is a standard template identical in many services. Overriding below for attributes explicitly preserved. -->
+		<!-- A DOCTYPE declaration can be produced for multiple output transforms by setting both @cms:doctype-public and @cms:doctype-system attributes. -->
+		<!-- The primary output can be controlled by the standard result-document parameters. -->
 	</xsl:template>
 	
 </xsl:stylesheet>
