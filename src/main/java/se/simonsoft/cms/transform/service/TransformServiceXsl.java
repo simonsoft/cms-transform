@@ -152,7 +152,9 @@ public class TransformServiceXsl implements TransformService {
 		
 		List<String> messages = transformOptions.getMessageListener().getMessages();
 		String completeMessage = getCompleteMessageString(config.getOptions().getParams().get("comment"), messages);
-		patchset.setHistoryMessage(completeMessage);
+		if (completeMessage != null) {
+			patchset.setHistoryMessage(completeMessage);
+		}
 		
 		RepoRevision r = commit.run(patchset);
 		logger.debug("Transform complete, commited with rev: {}", r.getNumber());
