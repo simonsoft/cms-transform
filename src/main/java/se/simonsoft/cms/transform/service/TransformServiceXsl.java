@@ -162,15 +162,21 @@ public class TransformServiceXsl implements TransformService {
 		StringBuilder sb = new StringBuilder();
 		sb.append(comment);
 		sb.append("\n");
-		for (String message: messages) {
+		
+		Iterator<String> iterator = messages.iterator();
+		boolean addMoreMessages = iterator.hasNext();
+		while (addMoreMessages) {
+			String message = iterator.next();
 			if (message != null && !message.trim().isEmpty()) {
 				if ((sb.length() + message.length()) < HISTORY_MSG_MAX_SIZE) {
 					sb.append("\n");
 					sb.append(message);
+					addMoreMessages = iterator.hasNext();
 				} else {
-					logger.info("Max size reached truncating");
+					logger.info("Max history message size ({}) reached truncating", HISTORY_MSG_MAX_SIZE);
 					sb.append("\n");
 					sb.append("...");
+					addMoreMessages = false;
 				}
 			}
 		}

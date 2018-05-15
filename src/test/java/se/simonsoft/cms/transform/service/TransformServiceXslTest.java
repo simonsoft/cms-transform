@@ -270,8 +270,8 @@ public class TransformServiceXslTest {
 		configOptions.setType("xsl");
 
 		Map<String, String> optionsParams = new HashMap<String, String>();
-		optionsParams.put("stylesheet", "/stylesheet/transform-single-output.xsl");
-		optionsParams.put("output", "/transformed/single");
+		optionsParams.put("stylesheet", "/stylesheet/transform-multiple-output.xsl");
+		optionsParams.put("output", "/transformed/multiple");
 		optionsParams.put("overwrite", "");
 		optionsParams.put("comment", getCommentTwoThousandBytesPlus());
 		configOptions.setParams(optionsParams);
@@ -285,8 +285,8 @@ public class TransformServiceXslTest {
 		
 		CmsItemProperties revisionProperties = commit.getCmsContentsReader().getRevisionProperties(itemNew.getRevisionChanged());
 		String history = revisionProperties.getString("svn:log");
-		assertTrue(history.contains("Lorem ipsum dolor sit amet"));
-		assertTrue(history.contains("..."));
+		assertTrue(history.startsWith("Lorem ipsum dolor sit amet"));
+		assertTrue(history.endsWith("..."));
 		
 	}
 
