@@ -16,6 +16,7 @@
 package se.simonsoft.cms.transform.service;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -285,6 +286,8 @@ public class TransformServiceXslTest {
 
 		String string = baos.toString(StandardCharsets.UTF_8.name());
 		assertTrue(string.contains("multiple-output=\"true\""));
+		assertTrue("Primary output should have DOCTYPE decl", string.contains("DOCTYPE"));
+		assertTrue("Primary output should have DOCTYPE decl", string.contains("PRIMARY"));
 		
 		CmsItemId sec1Id = new CmsItemIdArg(repo, new CmsItemPath(itemId.getRelPath().getParent().getPath().concat("/sections/section1.xml")));
 		CmsItem sec1Item = lookup.getItem(sec1Id);
@@ -297,6 +300,10 @@ public class TransformServiceXslTest {
 		String sect1Str = baos1.toString(StandardCharsets.UTF_8.name());
 		assertTrue(sect1Str.contains("multiple-output=\"true\""));
 		assertTrue(sect1Str.contains("name=\"section1.xml\""));
+		assertTrue("Multiple output should have DOCTYPE decl", sect1Str.contains("DOCTYPE"));
+		assertTrue("Multiple output should have DOCTYPE decl", sect1Str.contains("MULTIPLE"));
+		assertFalse("Should clean up temporary doctype attrs", sect1Str.contains("cms:doctype-public"));
+		assertFalse("Should clean up temporary doctype attrs", sect1Str.contains("cms:doctype-system"));
 		
 		CmsItemId sec2Id = new CmsItemIdArg(repo, new CmsItemPath(itemId.getRelPath().getParent().getPath().concat("/sections/section2.xml")));
 		CmsItem sec2Item = lookup.getItem(sec2Id);

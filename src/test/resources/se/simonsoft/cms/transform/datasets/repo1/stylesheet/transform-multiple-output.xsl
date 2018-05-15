@@ -17,8 +17,10 @@
 
 -->
 <xsl:stylesheet version="2.0"
-    xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
-    <xsl:output method="xml" indent="yes" />
+    xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+    xmlns:cms="http://www.simonsoft.se/namespace/cms">
+    
+    <xsl:output method="xml" doctype-public="PRIMARY" doctype-system="primary.dtd" indent="yes" />
 
     <xsl:template match="@* | node()">
         <xsl:copy>
@@ -37,6 +39,8 @@
     <xsl:template match="section">
     	<xsl:result-document  href="sections/{@name}">
     		<xsl:copy>
+    		    <xsl:attribute name="cms:doctype-public" select="'MULTIPLE'"/>
+    		    <xsl:attribute name="cms:doctype-system" select="'multiple.dtd'"/>
 				<xsl:apply-templates select="@* | node()" />
 			</xsl:copy>
     	</xsl:result-document>
