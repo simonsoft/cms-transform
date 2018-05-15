@@ -73,6 +73,7 @@ public class TransformItemChangedEventListener implements ItemChangedEventListen
 		}
 		
 		if (!isWithinTransformPath(item)) {
+			logger.info("Transform not enabled for path: {}", item.getId().getRelPath());
 			return;
 		}
 
