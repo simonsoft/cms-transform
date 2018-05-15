@@ -38,6 +38,7 @@
     	<xsl:result-document  href="sections/{@name}">
     		<xsl:copy>
 				<xsl:apply-templates select="@* | node()" />
+				<xsl:message><xsl:text>Transform multiple output</xsl:text></xsl:message>
 			</xsl:copy>
     	</xsl:result-document>
     </xsl:template>

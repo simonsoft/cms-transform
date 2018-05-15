@@ -23,6 +23,7 @@ import java.io.PushbackInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -52,6 +53,7 @@ import se.simonsoft.cms.item.properties.CmsItemPropertiesMap;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceDocumentS9api;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceReaderS9api;
+import se.simonsoft.cms.xmlsource.transform.SaxonMessageListener;
 import se.simonsoft.cms.xmlsource.transform.SaxonOutputURIResolverXdm;
 import se.simonsoft.cms.xmlsource.transform.TransformOptions;
 import se.simonsoft.cms.xmlsource.transform.TransformStreamProvider;
@@ -71,6 +73,7 @@ public class TransformServiceXsl implements TransformService {
 	private static final String TRANSFORM_LOCK_COMMENT = "Locked for transform";
 	private static final String TRANSFORM_BASE_PROP_KEY = "abx:TransformBase";
 	private static final String TRANSFORM_NAME_PROP_KEY = "abx:TransformName";
+	private static final int HISTORY_MSG_MAX_SIZE = 2000;
 	private static final Logger logger = LoggerFactory.getLogger(TransformServiceXsl.class);
 
 	@Inject
@@ -147,13 +150,35 @@ public class TransformServiceXsl implements TransformService {
 			addToPatchset(patchset, path, streamProvider, overwrite, props);
 		}
 		
+		List<String> messages = transformOptions.getMessageListener().getMessages();
+		String completeMessage = getCompleteMessageString(config.getOptions().getParams().get("comment"), messages);
+		patchset.setHistoryMessage(completeMessage);
+		
 		RepoRevision r = commit.run(patchset);
 		logger.debug("Transform complete, commited with rev: {}", r.getNumber());
 	}
 	
+	private String getCompleteMessageString(String comment, List<String> messages) {
+		StringBuilder sb = new StringBuilder();
+		sb.append(comment);
+		sb.append("\n");
+		for (String message: messages) {
+			if (message != null && !message.trim().isEmpty()) {
+				if ((sb.length() + message.length()) < HISTORY_MSG_MAX_SIZE) {
+					sb.append("\n");
+					sb.append(message);
+				} else {
+					logger.info("Max size reached truncating");
+					sb.append("\n");
+					sb.append("...");
+				}
+			}
+		}
+		return sb.toString();
+	}
+	
 	private void addToPatchset(CmsPatchset patchset, CmsItemPath relPath, TransformStreamProvider streamProvider, boolean overwrite, CmsItemPropertiesMap properties) {
 		try {
-			
 			final InputStream transformStream = getInputStreamNotEmpty(streamProvider.get());
 			boolean pathExists = pathExists(patchset.getRepository(), relPath);
 			if (!pathExists) {
