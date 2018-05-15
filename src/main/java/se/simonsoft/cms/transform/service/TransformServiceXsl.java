@@ -68,12 +68,14 @@ public class TransformServiceXsl implements TransformService {
 	private final CmsRepositoryLookup repoLookup;
 	private final Map<String, Source> stylesheets;
 	private final XmlSourceReaderS9api sourceReader;
-	private final TransformerService transformerIdentity;
+	private final TransformerService transformerOutput;
 	
 	private static final String TRANSFORM_LOCK_COMMENT = "Locked for transform";
 	private static final String TRANSFORM_BASE_PROP_KEY = "abx:TransformBase";
 	private static final String TRANSFORM_NAME_PROP_KEY = "abx:TransformName";
 	private static final int HISTORY_MSG_MAX_SIZE = 2000;
+	private static final String OUTPUT_TRANSFORM = "se/simonsoft/cms/transform/output.xsl";
+  
 	private static final Logger logger = LoggerFactory.getLogger(TransformServiceXsl.class);
 
 	@Inject
@@ -90,7 +92,7 @@ public class TransformServiceXsl implements TransformService {
 		this.itemLookup = itemLookup;
 		this.repoLookup = lookupRepo;
 		this.transformerServiceFactory = transfromerServiceFactory;
-		this.transformerIdentity = transfromerServiceFactory.buildTransformerService(new StreamSource(this.getClass().getClassLoader().getResourceAsStream("se/simonsoft/cms/xmlsource/transform/identity.xsl")));
+		this.transformerOutput = transfromerServiceFactory.buildTransformerService(new StreamSource(this.getClass().getClassLoader().getResourceAsStream(OUTPUT_TRANSFORM)));
 		this.stylesheets = stylesheets;
 		this.sourceReader = sourceReader;
 	}
@@ -142,7 +144,7 @@ public class TransformServiceXsl implements TransformService {
 			}
 			
 			XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(relpath);
-			TransformStreamProvider streamProvider = transformerIdentity.getTransformStreamProvider(resultDocument, null);
+			TransformStreamProvider streamProvider = transformerOutput.getTransformStreamProvider(resultDocument, null);
 			
 			CmsItemPath path = outputPath.append(Arrays.asList(relpath.split("/")));
 			addToPatchset(patchset, path, streamProvider, overwrite, props);
