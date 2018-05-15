@@ -150,7 +150,7 @@ public class TransformServiceXsl implements TransformService {
 		
 		List<String> messages = transformOptions.getMessageListener().getMessages();
 		String completeMessage = getCompleteMessageString(config.getOptions().getParams().get("comment"), messages);
-		if (completeMessage != null) {
+		if (completeMessage != null && !completeMessage.trim().isEmpty()) {
 			patchset.setHistoryMessage(completeMessage);
 		}
 		
