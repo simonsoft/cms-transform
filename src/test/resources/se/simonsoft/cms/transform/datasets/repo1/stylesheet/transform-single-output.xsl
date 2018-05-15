@@ -31,6 +31,7 @@
             <xsl:attribute name="single-output">true</xsl:attribute>
             <xsl:apply-templates select="@* | node()" />
         </xsl:copy>
+        <xsl:message><xsl:text>Transform single output</xsl:text></xsl:message>
     </xsl:template>
 
 </xsl:stylesheet>

@@ -258,6 +258,38 @@ public class TransformServiceXslTest {
 			assertEquals("Specified output must be an existing folder: /xml/nonexisting", e.getMessage());
 		}
 	}
+	
+	@Test
+	public void testLongTruncatedComment() throws Exception {
+		CmsItemId itemId = new CmsItemIdArg(transformTestDoc).withPegRev(1L);
+		CmsItem item = lookup.getItem(itemId);
+
+		TransformConfig config = new TransformConfig();
+		config.setActive(true);
+
+		TransformConfigOptions configOptions = new TransformConfigOptions();
+		configOptions.setType("xsl");
+
+		Map<String, String> optionsParams = new HashMap<String, String>();
+		optionsParams.put("stylesheet", "/stylesheet/transform-multiple-output.xsl");
+		optionsParams.put("output", "/transformed/multiple");
+		optionsParams.put("overwrite", "");
+		optionsParams.put("comment", getCommentTwoThousandBytesPlus());
+		configOptions.setParams(optionsParams);
+
+		config.setOptions(configOptions);
+
+		transformService.transform(item, config);
+		
+		CmsItemId itemIdNew = new CmsItemIdArg(repo, new CmsItemPath(optionsParams.get("output")).append(itemId.getRelPath().getName()));
+		CmsItem itemNew = lookup.getItem(itemIdNew);
+		
+		CmsItemProperties revisionProperties = commit.getCmsContentsReader().getRevisionProperties(itemNew.getRevisionChanged());
+		String history = revisionProperties.getString("svn:log");
+		assertTrue(history.startsWith("Lorem ipsum dolor sit amet"));
+		assertTrue(history.endsWith("..."));
+		
+	}
 
 	@Test
 	public void testMultipleOutputFolderDefaultOverwriteTrue() throws Exception {
@@ -309,6 +341,11 @@ public class TransformServiceXslTest {
 		CmsItem sec2Item = lookup.getItem(sec2Id);
 		
 		assertEquals(itemId.getLogicalId(), sec2Item.getProperties().getString("abx:TransformBase"));
+		
+		CmsItemProperties revisionProperties = commit.getCmsContentsReader().getRevisionProperties(sec2Item.getRevisionChanged());
+		String history = revisionProperties.getString("svn:log");
+		assertTrue(history.contains("Overwrite transform!"));
+		assertTrue(history.contains("Transform multiple output"));
 		
 		ByteArrayOutputStream baos2 = new ByteArrayOutputStream();
 		sec2Item.getContents(baos2);
@@ -549,6 +586,16 @@ public class TransformServiceXslTest {
 	@Ignore
 	public void testCommentIsVelocityString() throws Exception {
 		// Future implementation. Comment may be a velocity formated string.
+	}
+	
+	private String getCommentTwoThousandBytesPlus() {
+		return "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer non vulputate orci. Curabitur dapibus posuere placerat. Nunc dui velit, iaculis nec nulla non, mollis dapibus diam. Praesent suscipit velit sit amet mauris pellentesque commodo ac sed odio. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Donec eleifend diam ut nunc accumsan, at consectetur tortor aliquam. Suspendisse convallis odio velit, eu bibendum dolor auctor in. Proin et egestas mi. Vivamus rhoncus lacus sed arcu pretium aliquet. Fusce congue volutpat odio nec ultrices. Cras tellus turpis, pulvinar eu felis auctor, tincidunt egestas nisl. Donec placerat, ex sit amet vestibulum vestibulum, ante mi pellentesque est, a porta dolor sem sit amet arcu.\n" + 
+				"\n" + 
+				"Donec faucibus nisi nisl, vitae maximus nibh sodales ut. Donec et ornare nisl. Integer tincidunt lorem vel dolor porttitor vestibulum. Interdum et malesuada fames ac ante ipsum primis in faucibus. Integer semper ac dui ut mollis. Cras ultricies vehicula nibh, in pharetra sem. Morbi sollicitudin risus sit amet convallis blandit. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus commodo non augue a feugiat. Integer sit amet diam ligula. Nulla sagittis, nisi in suscipit hendrerit, tellus neque placerat elit, sed imperdiet tortor urna nec ex.\n" + 
+				"\n" + 
+				"Vivamus pellentesque tincidunt erat, sit amet sodales est commodo rutrum. Integer ullamcorper finibus velit, ut posuere lorem malesuada vel. Vestibulum non elementum neque, et tempor risus. Praesent eu cursus felis, ut egestas velit. Proin est augue, dapibus in leo vel, congue dignissim nibh. Suspendisse tempus leo ligula, quis pharetra odio tempus ac. Praesent at elementum felis. Donec quis libero elit. Etiam ultricies purus urna, ac scelerisque ante euismod nec. Maecenas blandit tortor quam, ac venenatis magna commodo vel. Vestibulum aliquam turpis orci, ut pretium erat tempus vel.\n" + 
+				"\n" + 
+				"Mauris faucibus, elit dictum tempor viverra, est tortor faucibus sapien, eget volutpat nulla turpis scelerisque sem. Donec non posuere libero, ac blandit eros. Fusce semper mauris non ultricies gravida. Aenean molestie vel nunc eu porta. Integer suscipit convallis sapien sed commodo. Nunc maximus nisl a varius semper. Nulla molestie arcu magna, nec ultricies magna eleifend amet.";
 	}
 
 }

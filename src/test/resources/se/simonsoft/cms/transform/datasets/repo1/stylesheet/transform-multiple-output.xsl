@@ -42,6 +42,7 @@
     		    <xsl:attribute name="cms:doctype-public" select="'MULTIPLE'"/>
     		    <xsl:attribute name="cms:doctype-system" select="'multiple.dtd'"/>
 				<xsl:apply-templates select="@* | node()" />
+				<xsl:message><xsl:text>Transform multiple output</xsl:text></xsl:message>
 			</xsl:copy>
     	</xsl:result-document>
     </xsl:template>
