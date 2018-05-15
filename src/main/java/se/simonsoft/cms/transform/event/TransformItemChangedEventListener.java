@@ -15,6 +15,9 @@
  */
 package se.simonsoft.cms.transform.event;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -25,8 +28,11 @@ import org.slf4j.LoggerFactory;
 
 import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemKind;
+import se.simonsoft.cms.item.CmsItemPath;
 import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.events.ItemChangedEventListener;
+import se.simonsoft.cms.item.info.CmsItemLookup;
+import se.simonsoft.cms.item.properties.CmsItemProperties;
 import se.simonsoft.cms.transform.config.TransformConfiguration;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.transform.service.TransformService;
@@ -35,19 +41,23 @@ public class TransformItemChangedEventListener implements ItemChangedEventListen
 
 	private final TransformConfiguration transformConfiguration;
 	private final Map<CmsRepository, TransformService> transformServices;
+	private final Map<CmsRepository, CmsItemLookup> itemLookup;
 
 	private static final String TRANSFORM_BASE_PROP_KEY = "abx:TransformBase";
+	private static final String TRANSFORM_PATHS_WHITE_LIST = "cmsconfig:TransformPaths";
 
 	private static final Logger logger = LoggerFactory.getLogger(TransformItemChangedEventListener.class);
 
 	@Inject
 	public TransformItemChangedEventListener(
 			TransformConfiguration transformConfiguration,
-			Map<CmsRepository, TransformService> transformServices
+			Map<CmsRepository, TransformService> transformServices,
+			Map<CmsRepository, CmsItemLookup> itemLookup
 			) {
 
 		this.transformConfiguration = transformConfiguration;
 		this.transformServices = transformServices;
+		this.itemLookup = itemLookup;
 	}
 
 	@Override
@@ -59,6 +69,10 @@ public class TransformItemChangedEventListener implements ItemChangedEventListen
 		}
 		
 		if (item.getKind() != CmsItemKind.File) {
+			return;
+		}
+		
+		if (!isWithinTransformPath(item)) {
 			return;
 		}
 
@@ -86,6 +100,34 @@ public class TransformItemChangedEventListener implements ItemChangedEventListen
 				}
 			}
 		}
+	}
+	
+	private boolean isWithinTransformPath(CmsItem item) {
+		
+		CmsRepository repository = item.getId().getRepository();
+		CmsItem repoItem = itemLookup.get(repository).getItem(repository.getItemId());
+		
+		CmsItemProperties properties = repoItem.getProperties();
+		String pathsString = properties.getString(TRANSFORM_PATHS_WHITE_LIST);
+		
+		List<String> whiteListedPaths = new ArrayList<>();
+		if (pathsString != null && !pathsString.trim().isEmpty()) {
+			String[] split = pathsString.trim().split("\\r?\\n"); //removing surrounding white space and the split on new lines.
+			whiteListedPaths.addAll(Arrays.asList(split));
+			logger.debug("Number of white listed paths: {}", whiteListedPaths.size());
+		}
+		
+		boolean withinWhiteList = false;
+		for (String p: whiteListedPaths) {
+			final String trimmedPath = p.trim();
+			CmsItemPath whiteListedPath = new CmsItemPath(trimmedPath);
+			if (whiteListedPath.isAncestorOf(item.getId().getRelPath())) {
+				withinWhiteList = true;
+				logger.debug("Item is within a white listed path, will proceed with the transform");
+			}
+		}
+		
+		return withinWhiteList;
 	}
 
 }
