@@ -31,7 +31,12 @@
 				<author>m</author>
 				<date>2013-01-04T14:33:14.600772Z</date>
 			</commit>
-			<properties/>
+			<properties>
+				<property name="cmsconfig:TransformPaths">
+					/doc
+					/transformed/single
+				</property>
+			</properties>
 		</entry>
 		<entry kind="dir">
 			<name>doc</name>

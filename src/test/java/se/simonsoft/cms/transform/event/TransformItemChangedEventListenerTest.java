@@ -29,6 +29,7 @@ import java.util.Map;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
@@ -63,6 +64,7 @@ public class TransformItemChangedEventListenerTest {
 
 	private static CmsRepositoryLookup repoLookup;
 	private static TransformConfiguration transformConfig;
+	private Map<CmsRepository, CmsItemLookup> lookups = new HashMap<>();
 
 	static Long startRev = new Long(1); // Defined as youngest in the filexml repo.
 
@@ -79,7 +81,7 @@ public class TransformItemChangedEventListenerTest {
 		repoLookup = indexing.getContext().getInstance(CmsRepositoryLookup.class);
 		transformConfig = new TransformConfigurationDefault(repoLookup, new ObjectMapper().reader());
 		
-		
+		lookups.put(repo, lookup);
 	}
 
 	@After
@@ -100,7 +102,7 @@ public class TransformItemChangedEventListenerTest {
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc).withPegRev(1L);
 		CmsItem item = lookup.getItem(itemId);
 		
-		TransformItemChangedEventListener eventListener = new TransformItemChangedEventListener(spyTransformConfig, transformServices);
+		TransformItemChangedEventListener eventListener = new TransformItemChangedEventListener(spyTransformConfig, transformServices, lookups);
 		eventListener.onItemChange(item);
 		
 		ArgumentCaptor<CmsItemId> itemIdCaptor = ArgumentCaptor.forClass(CmsItemId.class);
@@ -131,7 +133,7 @@ public class TransformItemChangedEventListenerTest {
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
 		CmsItem item = lookup.getItem(itemId);
 		
-		TransformItemChangedEventListener eventListener = new TransformItemChangedEventListener(spyTransformConfig, transformServices);
+		TransformItemChangedEventListener eventListener = new TransformItemChangedEventListener(spyTransformConfig, transformServices, lookups);
 		try {
 			eventListener.onItemChange(item);
 			fail("Should fail");
@@ -152,12 +154,34 @@ public class TransformItemChangedEventListenerTest {
 		CmsItemId itemIdFolder = new CmsItemIdArg("x-svn:///svn/repo1^/doc").withPegRev(1L);
 		CmsItem item = lookup.getItem(itemIdFolder);
 		
-		TransformItemChangedEventListener eventListener = new TransformItemChangedEventListener(spyTransformConfig, transformServices);
+		TransformItemChangedEventListener eventListener = new TransformItemChangedEventListener(spyTransformConfig, transformServices, lookups);
 		eventListener.onItemChange(item);
 		
 		verify(spyTransformConfig, times(0)).getConfiguration(Mockito.any(CmsItemId.class));
 		verify(spyTransformService, times(0)).transform(Mockito.any(CmsItem.class), Mockito.any(TransformConfig.class));
 	}
+	
+	@Test
+	public void testItemNotWithinWhitelist() {
+		//Repository config white lists /doc and /transformed/single
+		
+		TransformService spyTransformService = spy(TransformService.class);
+		Map<CmsRepository, TransformService> transformServices = new HashMap<CmsRepository, TransformService>();
+		transformServices.put(repo, spyTransformService);
+		
+		TransformConfiguration spyTransformConfig = spy(transformConfig);
+		
+		CmsItemId itemIdFolder = new CmsItemIdArg("x-svn:///svn/repo1^/transformed/multiple/existing/section1.xml").withPegRev(1L);
+		CmsItem item = lookup.getItem(itemIdFolder);
+		
+		TransformItemChangedEventListener eventListener = new TransformItemChangedEventListener(spyTransformConfig, transformServices, lookups);
+		eventListener.onItemChange(item);
+		
+		verify(spyTransformConfig, times(0)).getConfiguration(Mockito.any(CmsItemId.class));
+		verify(spyTransformService, times(0)).transform(Mockito.any(CmsItem.class), Mockito.any(TransformConfig.class));
+		
+	}
+	
 	
 	public class ConfigComparator implements Comparator<TransformConfig> {
 
