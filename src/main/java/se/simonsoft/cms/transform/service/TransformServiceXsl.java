@@ -126,8 +126,6 @@ public class TransformServiceXsl implements TransformService {
 		transformerService.setItemLookup(itemLookup);
 		
 		final CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
-		patchset.setHistoryMessage(config.getOptions().getParams().get("comment"));
-		
 		final CmsItemPropertiesMap props = getProperties(base, config);
 		
 		SaxonOutputURIResolverXdm outputURIResolver = new SaxonOutputURIResolverXdm(sourceReader);
