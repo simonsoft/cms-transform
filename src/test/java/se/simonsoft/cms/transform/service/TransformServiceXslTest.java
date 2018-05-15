@@ -302,6 +302,7 @@ public class TransformServiceXslTest {
 		assertTrue("Multiple output should have DOCTYPE decl", sect1Str.contains("DOCTYPE"));
 		assertTrue("Multiple output should have DOCTYPE decl", sect1Str.contains("MULTIPLE"));
 		assertFalse("Should clean up temporary doctype attrs", sect1Str.contains("cms:doctype-public"));
+		assertFalse("Should clean up temporary doctype attrs", sect1Str.contains("cms:doctype-system"));
 		
 		CmsItemId sec2Id = new CmsItemIdArg(repo, new CmsItemPath(itemId.getRelPath().getParent().getPath().concat("/sections/section2.xml")));
 		CmsItem sec2Item = lookup.getItem(sec2Id);
