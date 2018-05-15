@@ -205,12 +205,13 @@ public class TransformServiceXsl implements TransformService {
 		
 		if (stylesheet.startsWith("/")) {
 			CmsItemId styleSheetItemId = itemId.getRepository().getItemId().withRelPath(new CmsItemPath(stylesheet));
-			logger.debug("Using stylesheet from CMS: {}", styleSheetItemId.getLogicalId());
+			logger.debug("Using stylesheet from repo: {}", styleSheetItemId.getLogicalId());
 			CmsItem styleSheetItem;
 			try {
 				 styleSheetItem = itemLookup.getItem(styleSheetItemId);
+				 logger.debug("Using stylesheet from repo: {} {}", styleSheetItemId.getLogicalId(), styleSheetItem.getRevisionChanged());
 			} catch (CmsItemNotFoundException e) {
-				throw new IllegalArgumentException("Specified stylesheet do not exist at path: " + stylesheet, e);
+				throw new IllegalArgumentException("Specified stylesheet does not exist at path: " + stylesheet, e);
 			}
 			
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -266,7 +267,12 @@ public class TransformServiceXsl implements TransformService {
 	private CmsItemPropertiesMap getProperties(CmsItem baseItem, TransformConfig config) {
 		
 		CmsItemPropertiesMap m = new CmsItemPropertiesMap();
-		m.put(TRANSFORM_BASE_PROP_KEY, baseItem.getId().getLogicalId());
+		CmsItemId baseId = baseItem.getId();
+		
+		// TODO: Include rev if configured to do so.
+		baseId = baseId.withPegRev(null); // Remove revision to avoid commit on items that have not changed.
+		
+		m.put(TRANSFORM_BASE_PROP_KEY, baseId.getLogicalId());
 		m.put(TRANSFORM_NAME_PROP_KEY, config.getName());
 		return m;
 	}

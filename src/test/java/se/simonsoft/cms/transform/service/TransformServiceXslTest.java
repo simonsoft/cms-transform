@@ -214,14 +214,15 @@ public class TransformServiceXslTest {
 		try {
 			transformService.transform(item, config);
 		} catch (IllegalArgumentException e) {
-			fail("Output folder is valid. Should not throw excepetion: " + e.getMessage());
+			fail("Output folder is valid. Should not throw exception: " + e.getMessage());
 		}
 		
 		CmsItemId itemIdNew = new CmsItemIdArg(repo, new CmsItemPath(optionsParams.get("output")).append(itemId.getRelPath().getName()));
 		CmsItem itemNew = lookup.getItem(itemIdNew);
 		
 		CmsItemProperties properties = itemNew.getProperties();
-		assertEquals(itemId.getLogicalId(), properties.getString("abx:TransformBase"));
+		assertEquals("x-svn:///svn/repo1^/doc/transform-test.xml", properties.getString("abx:TransformBase"));
+		
 		
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		itemNew.getContents(baos);
@@ -491,7 +492,7 @@ public class TransformServiceXslTest {
 		try {
 			transformService.transform(item, config);
 		} catch (IllegalArgumentException e) {
-			assertEquals("Specified stylesheet do not exist at path: /non/existing.xsl", e.getMessage());
+			assertEquals("Specified stylesheet does not exist at path: /non/existing.xsl", e.getMessage());
 		}
 	}
 	

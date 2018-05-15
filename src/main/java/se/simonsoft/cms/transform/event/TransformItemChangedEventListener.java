@@ -43,8 +43,8 @@ public class TransformItemChangedEventListener implements ItemChangedEventListen
 	private final Map<CmsRepository, TransformService> transformServices;
 	private final Map<CmsRepository, CmsItemLookup> itemLookup;
 
-	private static final String TRANSFORM_BASE_PROP_KEY = "abx:TransformBase";
 	private static final String TRANSFORM_PATHS_WHITE_LIST = "cmsconfig:TransformPaths";
+	private static final String TRANSFORM_NAME_PROP_KEY = "abx:TransformName";
 
 	private static final Logger logger = LoggerFactory.getLogger(TransformItemChangedEventListener.class);
 
@@ -81,7 +81,7 @@ public class TransformItemChangedEventListener implements ItemChangedEventListen
 		final Map<String, TransformConfig> configurations = transformConfiguration.getConfiguration(item.getId());
 		
 
-		if (!configurations.isEmpty() && item.getProperties().getString(TRANSFORM_BASE_PROP_KEY) != null) {
+		if (!configurations.isEmpty() && item.getProperties().getString(TRANSFORM_NAME_PROP_KEY) != null) {
 			logger.debug("Item is the result of a transform, suppressing: {}", item.getId());
 			return;
 		}
