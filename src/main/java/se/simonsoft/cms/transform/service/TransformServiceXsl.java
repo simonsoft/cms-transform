@@ -260,6 +260,7 @@ public class TransformServiceXsl implements TransformService {
 			if (sourcePath == null) {
 				throw new IllegalArgumentException("Could not find source with stylesheet name: " + stylesheet);
 			}
+			//TODO: Would be preferable to only compile the stylesheet once. Maybe we can compile them on initiation?
 			resultService = transformerServiceFactory.buildTransformerService(new StreamSource(this.getClass().getClassLoader().getResourceAsStream(sourcePath))); 
 		}
 		
