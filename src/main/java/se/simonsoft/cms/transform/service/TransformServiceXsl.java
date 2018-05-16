@@ -20,6 +20,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
+import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -142,6 +143,8 @@ public class TransformServiceXsl implements TransformService {
 			if (relpath.startsWith("/")) {
 				throw new IllegalArgumentException("Relative href must not start with slash: " + relpath);
 			}
+			
+			relpath = decodeHref(relpath);
 			
 			XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(relpath);
 			TransformStreamProvider streamProvider = transformerOutput.getTransformStreamProvider(resultDocument, null);
@@ -324,6 +327,16 @@ public class TransformServiceXsl implements TransformService {
 			patchset.add(new FolderExist(parentPath));
 
 		}
+	}
+	
+	private String decodeHref(String href) {
+		try {
+			href = java.net.URLDecoder.decode(href, "UTF-8");
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+			throw new IllegalArgumentException("Could not decode file name: " + href);
+		}
+		return href;
 	}
 	
 	private class EmptyStreamException extends Exception {
