@@ -54,7 +54,6 @@ import se.simonsoft.cms.item.properties.CmsItemPropertiesMap;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceDocumentS9api;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceReaderS9api;
-import se.simonsoft.cms.xmlsource.transform.SaxonMessageListener;
 import se.simonsoft.cms.xmlsource.transform.SaxonOutputURIResolverXdm;
 import se.simonsoft.cms.xmlsource.transform.TransformOptions;
 import se.simonsoft.cms.xmlsource.transform.TransformStreamProvider;
@@ -67,7 +66,7 @@ public class TransformServiceXsl implements TransformService {
 	private final CmsItemLookup itemLookup;
 	private final TransformerServiceFactory transformerServiceFactory;
 	private final CmsRepositoryLookup repoLookup;
-	private final Map<String, Source> stylesheets;
+	private final Map<String, String> stylesheets;
 	private final XmlSourceReaderS9api sourceReader;
 	private final TransformerService transformerOutput;
 	
@@ -85,7 +84,7 @@ public class TransformServiceXsl implements TransformService {
 			CmsItemLookup itemLookup,
 			CmsRepositoryLookup lookupRepo,
 			TransformerServiceFactory transfromerServiceFactory,
-			Map<String, Source> stylesheets,
+			Map<String, String> stylesheets,
 			XmlSourceReaderS9api sourceReader
 			) {
 		
@@ -257,11 +256,11 @@ public class TransformServiceXsl implements TransformService {
 			resultService = transformerServiceFactory.buildTransformerService(new StreamSource(new ByteArrayInputStream(baos.toByteArray())));
 		} else {
 			logger.debug("Using CMS built in stylesheet: {}", stylesheet);
-			Source source = stylesheets.get(stylesheet);
-			if (source == null) {
+			String sourcePath = stylesheets.get(stylesheet);
+			if (sourcePath == null) {
 				throw new IllegalArgumentException("Could not find source with stylesheet name: " + stylesheet);
 			}
-			resultService = transformerServiceFactory.buildTransformerService(source); 
+			resultService = transformerServiceFactory.buildTransformerService(new StreamSource(this.getClass().getClassLoader().getResourceAsStream(sourcePath))); 
 		}
 		
 		return resultService;
