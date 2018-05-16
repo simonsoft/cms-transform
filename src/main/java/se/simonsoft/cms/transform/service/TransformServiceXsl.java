@@ -20,6 +20,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
+import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -138,15 +139,16 @@ public class TransformServiceXsl implements TransformService {
 		addToPatchset(patchset, outputPath.append(baseItemId.getRelPath().getName()), baseStreamProvider, overwrite, props);
 		
 		Set<String> resultDocsHrefs = outputURIResolver.getResultDocumentHrefs();
-		for (String relpath: resultDocsHrefs) {
-			if (relpath.startsWith("/")) {
-				throw new IllegalArgumentException("Relative href must not start with slash: " + relpath);
+		for (String href: resultDocsHrefs) {
+			if (href.startsWith("/")) {
+				throw new IllegalArgumentException("Relative href must not start with slash: " + href);
 			}
 			
-			XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(relpath);
+			XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(href);
 			TransformStreamProvider streamProvider = transformerOutput.getTransformStreamProvider(resultDocument, null);
 			
-			CmsItemPath path = outputPath.append(Arrays.asList(relpath.split("/")));
+			String decodedHref = decodeHref(href); // Items will be commited with decoded hrefs.
+			CmsItemPath path = outputPath.append(Arrays.asList(decodedHref.split("/")));
 			addToPatchset(patchset, path, streamProvider, overwrite, props);
 		}
 		
@@ -324,6 +326,16 @@ public class TransformServiceXsl implements TransformService {
 			patchset.add(new FolderExist(parentPath));
 
 		}
+	}
+	
+	private String decodeHref(String href) {
+		try {
+			href = java.net.URLDecoder.decode(href, "UTF-8");
+		} catch (UnsupportedEncodingException e) {
+			logger.error("Could not decode URL", e);
+			throw new IllegalArgumentException("Could not decode URL: " + href);
+		}
+		return href;
 	}
 	
 	private class EmptyStreamException extends Exception {

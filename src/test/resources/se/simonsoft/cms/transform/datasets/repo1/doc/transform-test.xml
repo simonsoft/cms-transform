@@ -32,5 +32,9 @@ xml:lang="en-GB">
 			<title>Second chapter</title>
 			<p>The end is nigh.</p>
 		</section>
+		<section name="földer space/folder%20encoded/section3.xml">
+			<title>Third chapter</title>
+			<p>The end is nigh.</p>
+		</section>
 	</body>
 </document><?Pub Caret -2?>
