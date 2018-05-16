@@ -35,11 +35,6 @@
 	</xsl:template>
 	
 	
-	<xsl:template match="/">
-		<!-- For completeness: If this template was called from the document node, ensure that nothing is output before result-document. -->
-		<xsl:apply-templates select="element()"/>
-	</xsl:template>
-	
 	<!-- Match the document root element. -->
 	<xsl:template match="/element()"  priority="10">
 		<xsl:variable name="doctype.public" as="xs:string?" select="/*/@cms:doctype-public"/>
