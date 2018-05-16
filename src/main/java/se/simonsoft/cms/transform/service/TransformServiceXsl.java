@@ -139,17 +139,16 @@ public class TransformServiceXsl implements TransformService {
 		addToPatchset(patchset, outputPath.append(baseItemId.getRelPath().getName()), baseStreamProvider, overwrite, props);
 		
 		Set<String> resultDocsHrefs = outputURIResolver.getResultDocumentHrefs();
-		for (String relpath: resultDocsHrefs) {
-			if (relpath.startsWith("/")) {
-				throw new IllegalArgumentException("Relative href must not start with slash: " + relpath);
+		for (String href: resultDocsHrefs) {
+			if (href.startsWith("/")) {
+				throw new IllegalArgumentException("Relative href must not start with slash: " + href);
 			}
 			
-			relpath = decodeHref(relpath); // TODO: What happens if the href do contain a char that should not be decoded? Like a space in the filename or a %.  
-			
-			XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(relpath);
+			XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(href);
 			TransformStreamProvider streamProvider = transformerOutput.getTransformStreamProvider(resultDocument, null);
 			
-			CmsItemPath path = outputPath.append(Arrays.asList(relpath.split("/")));
+			String decodedHref = decodeHref(href); // Items will be commited with decoded hrefs.
+			CmsItemPath path = outputPath.append(Arrays.asList(decodedHref.split("/")));
 			addToPatchset(patchset, path, streamProvider, overwrite, props);
 		}
 		
