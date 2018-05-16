@@ -144,7 +144,7 @@ public class TransformServiceXsl implements TransformService {
 				throw new IllegalArgumentException("Relative href must not start with slash: " + relpath);
 			}
 			
-			relpath = decodeHref(relpath);
+			relpath = decodeHref(relpath); // TODO: What happens if the href do contain a char that should not be decoded? Like a space in the filename or a %.  
 			
 			XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(relpath);
 			TransformStreamProvider streamProvider = transformerOutput.getTransformStreamProvider(resultDocument, null);
