@@ -165,7 +165,10 @@ public class TransformServiceXsl implements TransformService {
 	private String getCompleteMessageString(String comment, List<String> messages) {
 		StringBuilder sb = new StringBuilder();
 		sb.append(comment);
-		sb.append("\n");
+		
+		if (!messages.isEmpty()) {
+			sb.append("\n");
+		}
 		
 		Iterator<String> iterator = messages.iterator();
 		boolean addMoreMessages = iterator.hasNext();
