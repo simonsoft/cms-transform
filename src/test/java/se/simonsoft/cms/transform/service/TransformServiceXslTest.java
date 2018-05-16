@@ -433,8 +433,40 @@ public class TransformServiceXslTest {
 		String sec2Str = baos2.toString(StandardCharsets.UTF_8.name());
 		assertTrue(sec2Str.contains("multiple-output=\"true\""));
 		assertTrue(sec2Str.contains("name=\"section2.xml\""));
-		
+	}
+	
+	@Test
+	public void testOutputWithEncodedHref() throws Exception {
+		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
+		CmsItem item = lookup.getItem(itemId);
 
+		TransformConfig config = new TransformConfig();
+		config.setActive(true);
+
+		TransformConfigOptions configOptions = new TransformConfigOptions();
+		configOptions.setType("xsl");
+
+		Map<String, String> optionsParams = new HashMap<String, String>();
+		optionsParams.put("stylesheet", "/stylesheet/transform-multiple-output.xsl");
+		optionsParams.put("output", "/transformed/multiple/existing");
+		optionsParams.put("overwrite", "true");
+		optionsParams.put("comment", "Automatic transform!");
+		configOptions.setParams(optionsParams);
+
+		config.setOptions(configOptions);
+
+		transformService.transform(item, config);
+		
+		String outputPath = optionsParams.get("output");
+		
+		// section3.xml path should have been url decoded (ö should be ö, the space should have been preserved and %20 should be decoded to space).
+		CmsItemId sec3Id = new CmsItemIdArg(repo, new CmsItemPath(outputPath.concat("/sections/földer space/folder encoded/section3.xml")));
+		CmsItem sec3Item = lookup.getItem(sec3Id.withPegRev(2L));
+		ByteArrayOutputStream baos3 = new ByteArrayOutputStream();
+		sec3Item.getContents(baos3);
+		String sec3Str = baos3.toString(StandardCharsets.UTF_8.name());
+		assertTrue(sec3Str.contains("multiple-output=\"true\""));
+		assertTrue(sec3Str.contains("name=\"földer space/folder%20encoded/section3.xml\""));
 	}
 
 	@Test
