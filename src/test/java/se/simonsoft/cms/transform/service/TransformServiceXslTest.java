@@ -83,12 +83,10 @@ public class TransformServiceXslTest {
 		TransformerServiceFactory transformerServiceFactory = indexing.getContext().getInstance(TransformerServiceFactory.class);
 		XmlSourceReaderS9api sourceReader = indexing.getContext().getInstance(XmlSourceReaderS9api.class);
 		
-		Map<String, Source> services = new HashMap<>();
-		StreamSource streamSourceMulti = new StreamSource(this.getClass().getClassLoader().getResourceAsStream("se/simonsoft/cms/transform/datasets/repo1/stylesheet/transform-multiple-output.xsl"));
-		StreamSource streamSourceSingle = new StreamSource(this.getClass().getClassLoader().getResourceAsStream("se/simonsoft/cms/transform/datasets/repo1/stylesheet/transform-single-output.xsl"));
+		Map<String, String> services = new HashMap<>();
 		
-		services.put("transform-multiple-output.xsl", streamSourceMulti);
-		services.put("transform-single-output.xsl", streamSourceSingle);
+		services.put("transform-multiple-output.xsl", "se/simonsoft/cms/transform/datasets/repo1/stylesheet/transform-multiple-output.xsl");
+		services.put("transform-single-output.xsl", "se/simonsoft/cms/transform/datasets/repo1/stylesheet/transform-single-output.xsl");
 		
 		transformService = new TransformServiceXsl(commit, lookup, repoLookup, transformerServiceFactory, services, sourceReader); // may exist a injected version. 
 	}
