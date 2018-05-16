@@ -35,8 +35,7 @@
 	</xsl:template>
 	
 	
-	<!-- Match the document root element. -->
-	<xsl:template match="/element()"  priority="10">
+	<xsl:template match="/"  priority="10">
 		<xsl:variable name="doctype.public" as="xs:string?" select="/*/@cms:doctype-public"/>
 		<xsl:variable name="doctype.system" as="xs:string?">
 			<xsl:if test="boolean($doctype.public)">
