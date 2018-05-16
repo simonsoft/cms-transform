@@ -333,7 +333,7 @@ public class TransformServiceXsl implements TransformService {
 		try {
 			href = java.net.URLDecoder.decode(href, "UTF-8");
 		} catch (UnsupportedEncodingException e) {
-			logger.error("Could not decode URL: {}", href);
+			logger.error("Could not decode URL", e);
 			throw new IllegalArgumentException("Could not decode URL: " + href);
 		}
 		return href;
