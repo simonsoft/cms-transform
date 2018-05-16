@@ -460,6 +460,7 @@ public class TransformServiceXslTest {
 		String outputPath = optionsParams.get("output");
 		
 		// section3.xml path should have been url decoded (ö should be ö, the space should have been preserved and %20 should be decoded to space).
+		// It is technically incorrect to send non-encoded string to result-document href. 
 		CmsItemId sec3Id = new CmsItemIdArg(repo, new CmsItemPath(outputPath.concat("/sections/földer space/folder encoded/section3.xml")));
 		CmsItem sec3Item = lookup.getItem(sec3Id.withPegRev(2L));
 		ByteArrayOutputStream baos3 = new ByteArrayOutputStream();
