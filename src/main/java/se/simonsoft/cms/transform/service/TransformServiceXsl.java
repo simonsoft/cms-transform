@@ -334,7 +334,7 @@ public class TransformServiceXsl implements TransformService {
 			href = java.net.URLDecoder.decode(href, "UTF-8");
 		} catch (UnsupportedEncodingException e) {
 			e.printStackTrace();
-			throw new IllegalArgumentException("Could not decode file name: " + href);
+			throw new IllegalArgumentException("Could not decode URL: " + href);
 		}
 		return href;
 	}
