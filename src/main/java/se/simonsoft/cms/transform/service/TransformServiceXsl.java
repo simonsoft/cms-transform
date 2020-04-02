@@ -15,8 +15,6 @@
  */
 package se.simonsoft.cms.transform.service;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
@@ -29,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 
 import javax.inject.Inject;
-import javax.xml.transform.Source;
 import javax.xml.transform.stream.StreamSource;
 
 import org.slf4j.Logger;
@@ -51,6 +48,7 @@ import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsItemNotFoundException;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
 import se.simonsoft.cms.item.properties.CmsItemPropertiesMap;
+import se.simonsoft.cms.item.stream.ByteArrayInOutStream;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceDocumentS9api;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceReaderS9api;
@@ -251,9 +249,11 @@ public class TransformServiceXsl implements TransformService {
 				throw new IllegalArgumentException("Specified stylesheet does not exist at path: " + stylesheet, e);
 			}
 			
-			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			// Stream implementation that does not copy the buffer in memory (keeps one copy).
+			// This is just the Stylesheet, not the content.
+			ByteArrayInOutStream baos = new ByteArrayInOutStream();
 			styleSheetItem.getContents(baos);
-			resultService = transformerServiceFactory.buildTransformerService(new StreamSource(new ByteArrayInputStream(baos.toByteArray())));
+			resultService = transformerServiceFactory.buildTransformerService(new StreamSource(baos.getInputStream()));
 		} else {
 			logger.debug("Using CMS built in stylesheet: {}", stylesheet);
 			String sourcePath = stylesheets.get(stylesheet);
