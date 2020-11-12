@@ -89,6 +89,8 @@ public class TransformItemChangedEventListener implements ItemChangedEventListen
 
 		for (Entry<String, TransformConfig> config: configurations.entrySet()) {
 			if (config.getValue().isActive()) {
+				
+				// TODO: Trigger work execution instead of executing here.
 				logger.debug("Config: '{}' is active, transforming...", config.getKey());
 				config.getValue().setName(config.getKey());
 				try {
