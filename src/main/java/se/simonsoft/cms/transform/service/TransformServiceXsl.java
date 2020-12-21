@@ -64,7 +64,6 @@ public class TransformServiceXsl implements TransformService {
 	private final CmsItemLookup itemLookup;
 	private final TransformerServiceFactory transformerServiceFactory;
 	private final CmsRepositoryLookup repoLookup;
-	private final Map<String, String> stylesheets;
 	private final XmlSourceReaderS9api sourceReader;
 	private final TransformerService transformerOutput;
 	
@@ -82,7 +81,6 @@ public class TransformServiceXsl implements TransformService {
 			CmsItemLookup itemLookup,
 			CmsRepositoryLookup lookupRepo,
 			TransformerServiceFactory transfromerServiceFactory,
-			Map<String, String> stylesheets,
 			XmlSourceReaderS9api sourceReader
 			) {
 		
@@ -91,7 +89,6 @@ public class TransformServiceXsl implements TransformService {
 		this.repoLookup = lookupRepo;
 		this.transformerServiceFactory = transfromerServiceFactory;
 		this.transformerOutput = transfromerServiceFactory.buildTransformerService(new StreamSource(this.getClass().getClassLoader().getResourceAsStream(OUTPUT_TRANSFORM)));
-		this.stylesheets = stylesheets;
 		this.sourceReader = sourceReader;
 	}
 
@@ -255,13 +252,8 @@ public class TransformServiceXsl implements TransformService {
 			styleSheetItem.getContents(baos);
 			resultService = transformerServiceFactory.buildTransformerService(new StreamSource(baos.getInputStream()));
 		} else {
-			logger.debug("Using CMS built in stylesheet: {}", stylesheet);
-			String sourcePath = stylesheets.get(stylesheet);
-			if (sourcePath == null) {
-				throw new IllegalArgumentException("Could not find source with stylesheet name: " + stylesheet);
-			}
-			//TODO: Would be preferable to only compile the stylesheet once. Maybe we can compile them on initiation?
-			resultService = transformerServiceFactory.buildTransformerService(new StreamSource(this.getClass().getClassLoader().getResourceAsStream(sourcePath))); 
+			// TODO: Guard against very long string 'stylesheet'.
+			resultService = transformerServiceFactory.buildTransformerService(stylesheet);
 		}
 		
 		return resultService;

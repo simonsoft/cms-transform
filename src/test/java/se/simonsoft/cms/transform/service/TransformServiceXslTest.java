@@ -82,14 +82,10 @@ public class TransformServiceXslTest {
 		repoLookup = indexing.getContext().getInstance(CmsRepositoryLookup.class);
 		TransformerServiceFactory transformerServiceFactory = indexing.getContext().getInstance(TransformerServiceFactory.class);
 		XmlSourceReaderS9api sourceReader = indexing.getContext().getInstance(XmlSourceReaderS9api.class);
-		
-		Map<String, String> services = new HashMap<>();
-		
-		services.put("transform-multiple-output.xsl", "se/simonsoft/cms/transform/datasets/repo1/stylesheet/transform-multiple-output.xsl");
-		services.put("transform-single-output.xsl", "se/simonsoft/cms/transform/datasets/repo1/stylesheet/transform-single-output.xsl");
-		
-		transformService = new TransformServiceXsl(commit, lookup, repoLookup, transformerServiceFactory, services, sourceReader); // may exist a injected version. 
+
+		transformService = new TransformServiceXsl(commit, lookup, repoLookup, transformerServiceFactory, sourceReader); // may exist a injected version. 
 	}
+	
 
 	@After
 	public void tearDown() {
@@ -559,7 +555,7 @@ public class TransformServiceXslTest {
 		try {
 			transformService.transform(item, config);
 		} catch (IllegalArgumentException e) {
-			assertEquals("Could not find source with stylesheet name: non-existing.xsl", e.getMessage());
+			assertEquals("No built-in stylesheet named: non-existing.xsl", e.getMessage());
 		}
 		
 		optionsParams.put("stylesheet", "/non/existing.xsl");

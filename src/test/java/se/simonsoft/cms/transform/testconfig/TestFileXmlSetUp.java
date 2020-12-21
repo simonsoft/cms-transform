@@ -46,7 +46,9 @@ public class TestFileXmlSetUp {
 	public void setUpIndexing() {
 		TestIndexOptions indexOptions = new TestIndexOptions().itemDefaultServices()
 				.addCore("reposxml", "se/simonsoft/cms/indexing/xml/solr/reposxml/**")
+				.addModule(new TestTransformModule())
 				.addModule(new IndexingHandlersModuleXml());
+			
 		indexing = ReposTestIndexing.getInstance(indexOptions);
 	}
 	
