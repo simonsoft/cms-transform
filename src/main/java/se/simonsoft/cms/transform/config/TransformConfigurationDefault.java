@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectReader;
+import com.google.inject.name.Named;
 
 import se.simonsoft.cms.item.CmsItemId;
 import se.simonsoft.cms.item.CmsItemKind;
@@ -45,7 +46,7 @@ public class TransformConfigurationDefault implements TransformConfiguration {
 
 	@Inject
 	public TransformConfigurationDefault(
-			CmsRepositoryLookup repositoryLookup,
+			@Named("global") CmsRepositoryLookup repositoryLookup,
 			ObjectReader reader
 			) {
 		
