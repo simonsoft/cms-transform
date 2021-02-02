@@ -69,7 +69,7 @@ public class TransformServiceXslTest {
 
 	static Long startRev = new Long(1); // Defined as youngest in the filexml repo.
 
-	static final String transformTestDoc = "x-svn:///svn/repo1^/doc/transform-test.xml";
+	static final String transformTestDoc = "x-svn:///svn/repo1/doc/transform-test.xml";
 
 	@Before
 	public void setup() throws Exception {
@@ -216,7 +216,7 @@ public class TransformServiceXslTest {
 		CmsItem itemNew = lookup.getItem(itemIdNew);
 		
 		CmsItemProperties properties = itemNew.getProperties();
-		assertEquals("x-svn:///svn/repo1^/doc/transform-test.xml", properties.getString("abx:TransformBase"));
+		assertEquals("x-svn:///svn/repo1/doc/transform-test.xml", properties.getString("abx:TransformBase"));
 		
 		
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
