@@ -68,7 +68,7 @@ public class TransformItemChangedEventListenerTest {
 
 	static Long startRev = new Long(1); // Defined as youngest in the filexml repo.
 
-	static final String transformTestDoc = "x-svn:///svn/repo1^/doc/transform-test.xml";
+	static final String transformTestDoc = "x-svn:///svn/repo1/doc/transform-test.xml";
 
 
 	@Before
@@ -151,7 +151,7 @@ public class TransformItemChangedEventListenerTest {
 		
 		TransformConfiguration spyTransformConfig = spy(transformConfig);
 		
-		CmsItemId itemIdFolder = new CmsItemIdArg("x-svn:///svn/repo1^/doc").withPegRev(1L);
+		CmsItemId itemIdFolder = new CmsItemIdArg("x-svn:///svn/repo1/doc").withPegRev(1L);
 		CmsItem item = lookup.getItem(itemIdFolder);
 		
 		TransformItemChangedEventListener eventListener = new TransformItemChangedEventListener(spyTransformConfig, transformServices, lookups);
@@ -171,7 +171,7 @@ public class TransformItemChangedEventListenerTest {
 		
 		TransformConfiguration spyTransformConfig = spy(transformConfig);
 		
-		CmsItemId itemIdFolder = new CmsItemIdArg("x-svn:///svn/repo1^/transformed/multiple/existing/section1.xml").withPegRev(1L);
+		CmsItemId itemIdFolder = new CmsItemIdArg("x-svn:///svn/repo1/transformed/multiple/existing/section1.xml").withPegRev(1L);
 		CmsItem item = lookup.getItem(itemIdFolder);
 		
 		TransformItemChangedEventListener eventListener = new TransformItemChangedEventListener(spyTransformConfig, transformServices, lookups);
