@@ -42,6 +42,7 @@ import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
 import se.simonsoft.cms.item.properties.CmsItemProperties;
+import se.simonsoft.cms.reporting.CmsItemLookupReporting;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.transform.config.databind.TransformConfigOptions;
 import se.simonsoft.cms.transform.testconfig.TestFileXmlSetUp;
@@ -54,6 +55,7 @@ public class TransformServiceXslTest {
 
 	private static TransformService transformService;
 	private static CmsItemLookup lookup;
+	private static CmsItemLookupReporting lookupReporting;
 	private static FilexmlCommit commit;
 
 	static final String hostname = "cmshostname:123"; //Port number has at times been a source of confusion when there are multiple issues at play.
@@ -76,11 +78,12 @@ public class TransformServiceXslTest {
 		commit = testSetUp.getCommit();
 		indexing = testSetUp.getIndexing();
 		lookup = indexing.getContext().getInstance(CmsItemLookup.class);
+		lookupReporting = null;
 		repoLookup = indexing.getContext().getInstance(CmsRepositoryLookup.class);
 		TransformerServiceFactory transformerServiceFactory = indexing.getContext().getInstance(TransformerServiceFactory.class);
 		XmlSourceReaderS9api sourceReader = indexing.getContext().getInstance(XmlSourceReaderS9api.class);
 
-		transformService = new TransformServiceXsl(commit, lookup, repoLookup, transformerServiceFactory, sourceReader); // may exist a injected version. 
+		transformService = new TransformServiceXsl(commit, lookup, lookupReporting, repoLookup, transformerServiceFactory, sourceReader); // may exist a injected version. 
 	}
 	
 

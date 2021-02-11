@@ -47,7 +47,9 @@ import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsItemNotFoundException;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
 import se.simonsoft.cms.item.properties.CmsItemPropertiesMap;
+import se.simonsoft.cms.reporting.CmsItemLookupReporting;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
+import se.simonsoft.cms.transform.lookup.CmsItemLookupTransform;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceDocumentS9api;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceReaderS9api;
 import se.simonsoft.cms.xmlsource.transform.SaxonOutputURIResolverXdm;
@@ -60,6 +62,8 @@ public class TransformServiceXsl implements TransformService {
 	
 	private final CmsCommit commit;
 	private final CmsItemLookup itemLookup;
+	private final CmsItemLookupReporting itemLookupReporting;
+	private final CmsItemLookup itemLookupTransform;
 	private final TransformerServiceFactory transformerServiceFactory;
 	private final CmsRepositoryLookup repoLookup;
 	private final XmlSourceReaderS9api sourceReader;
@@ -77,6 +81,7 @@ public class TransformServiceXsl implements TransformService {
 	public TransformServiceXsl(
 			CmsCommit commit,
 			CmsItemLookup itemLookup,
+			CmsItemLookupReporting itemLookupReporting,
 			CmsRepositoryLookup lookupRepo,
 			TransformerServiceFactory transfromerServiceFactory,
 			XmlSourceReaderS9api sourceReader
@@ -84,10 +89,13 @@ public class TransformServiceXsl implements TransformService {
 		
 		this.commit = commit;
 		this.itemLookup = itemLookup;
+		this.itemLookupReporting = itemLookupReporting;
 		this.repoLookup = lookupRepo;
 		this.transformerServiceFactory = transfromerServiceFactory;
 		this.transformerOutput = transfromerServiceFactory.buildTransformerService(new StreamSource(this.getClass().getClassLoader().getResourceAsStream(OUTPUT_TRANSFORM)));
 		this.sourceReader = sourceReader;
+		
+		this.itemLookupTransform = new CmsItemLookupTransform(itemLookup, itemLookupReporting);
 	}
 
 	@Override
@@ -117,7 +125,8 @@ public class TransformServiceXsl implements TransformService {
 		
 		final TransformerService transformerService = getTransformerService(baseItemId, stylesheet);
 		
-		transformerService.setItemLookup(itemLookup);
+		// CmsItemLookupTransform will capture items with specific class, normal items will resolve via normal CmsItemLookup.
+		transformerService.setItemLookup(itemLookupTransform);
 		
 		final CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
 		final CmsItemPropertiesMap props = getProperties(baseItemId, config);
