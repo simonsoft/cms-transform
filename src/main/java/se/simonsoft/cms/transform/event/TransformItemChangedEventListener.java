@@ -98,6 +98,7 @@ public class TransformItemChangedEventListener implements ItemChangedEventListen
 			if (e.getValue().isActive()) {
 				TransformConfig config = e.getValue();
 				// Trigger work execution instead of executing here.
+				// Supports injecting a userId to override the work command user, see doTransformWorkEnqueue;
 				logger.debug("Config: '{}' is active, starting work execution.", e.getKey());
 				config.setName(e.getKey());
 				doTransformWorkEnqueue(item, config);
