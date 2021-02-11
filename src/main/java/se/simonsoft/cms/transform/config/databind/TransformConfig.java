@@ -17,7 +17,9 @@ package se.simonsoft.cms.transform.config.databind;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-@JsonIgnoreProperties("name")
+// No longer ignoring "name" because it is needed across work execution. Not sure why it was ignored.
+//@JsonIgnoreProperties("name")
+@JsonIgnoreProperties(ignoreUnknown = true) // Allow future changes.
 public class TransformConfig {
 	
 	private boolean active;

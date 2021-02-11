@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import javax.inject.Inject;
+import javax.inject.Named;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,15 +34,20 @@ import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.events.ItemChangedEventListener;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.properties.CmsItemProperties;
+import se.simonsoft.cms.item.workflow.WorkflowExecutionException;
+import se.simonsoft.cms.item.workflow.WorkflowExecutor;
+import se.simonsoft.cms.item.workflow.WorkflowItemInput;
 import se.simonsoft.cms.transform.config.TransformConfiguration;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
-import se.simonsoft.cms.transform.service.TransformService;
 
 public class TransformItemChangedEventListener implements ItemChangedEventListener {
 
 	private final TransformConfiguration transformConfiguration;
-	private final Map<CmsRepository, TransformService> transformServices;
 	private final Map<CmsRepository, CmsItemLookup> itemLookup;
+	// Optionally override with injected userId, 
+	// e.g. when normal users upload files but should not be allowed to modify transform result.
+	private final String userId; 
+	private final WorkflowExecutor<WorkflowItemInput> workflowExecutor;
 
 	private static final String TRANSFORM_PATHS_WHITE_LIST = "cmsconfig:TransformPaths";
 	private static final String TRANSFORM_NAME_PROP_KEY = "abx:TransformName";
@@ -51,14 +57,18 @@ public class TransformItemChangedEventListener implements ItemChangedEventListen
 	@Inject
 	public TransformItemChangedEventListener(
 			TransformConfiguration transformConfiguration,
-			Map<CmsRepository, TransformService> transformServices,
-			Map<CmsRepository, CmsItemLookup> itemLookup
+			Map<CmsRepository, CmsItemLookup> itemLookup,
+			@Named("config:se.simonsoft.cms.transform.userid") String userId,
+			@Named("config:se.simonsoft.cms.aws.work.workflow") WorkflowExecutor<WorkflowItemInput> workflowExecutor
 			) {
 
 		this.transformConfiguration = transformConfiguration;
-		this.transformServices = transformServices;
 		this.itemLookup = itemLookup;
+		this.userId = userId;
+		this.workflowExecutor = workflowExecutor;
 	}
+	
+	
 
 	@Override
 	public void onItemChange(CmsItem item) {
@@ -77,30 +87,20 @@ public class TransformItemChangedEventListener implements ItemChangedEventListen
 			return;
 		}
 
-		CmsRepository repo = item.getId().getRepository();
-		final TransformService transformService = transformServices.get(repo);
 		final Map<String, TransformConfig> configurations = transformConfiguration.getConfiguration(item.getId());
-		
 
 		if (!configurations.isEmpty() && item.getProperties().getString(TRANSFORM_NAME_PROP_KEY) != null) {
 			logger.debug("Item is the result of a transform, suppressing: {}", item.getId());
 			return;
 		}
 
-		for (Entry<String, TransformConfig> config: configurations.entrySet()) {
-			if (config.getValue().isActive()) {
-				
-				// TODO: Trigger work execution instead of executing here.
-				logger.debug("Config: '{}' is active, transforming...", config.getKey());
-				config.getValue().setName(config.getKey());
-				try {
-					transformService.transform(item, config.getValue());
-					logger.debug("Transformed with config: '{}'", config.getKey());
-				} catch (Exception e) {
-					logger.error("Failed transform '{}': {}", config.getKey(), e.getMessage(), e);
-					// Best effort, for now.
-					// Could consider storing the exception and throwing outside the loop in order to trigger a retry.
-				}
+		for (Entry<String, TransformConfig> e: configurations.entrySet()) {
+			if (e.getValue().isActive()) {
+				TransformConfig config = e.getValue();
+				// Trigger work execution instead of executing here.
+				logger.debug("Config: '{}' is active, starting work execution.", e.getKey());
+				config.setName(e.getKey());
+				doTransformWorkEnqueue(item, config);
 			}
 		}
 	}
@@ -126,11 +126,25 @@ public class TransformItemChangedEventListener implements ItemChangedEventListen
 			CmsItemPath whiteListedPath = new CmsItemPath(trimmedPath);
 			if (whiteListedPath.isAncestorOf(item.getId().getRelPath())) {
 				withinWhiteList = true;
-				logger.debug("Item is within a white listed path, will proceed with the transform");
 			}
 		}
 		
 		return withinWhiteList;
+	}
+	
+	private void doTransformWorkEnqueue(CmsItem item, TransformConfig config) {
+		TransformItemWorkflowInput job = new TransformItemWorkflowInput(item.getId(), config);
+		// Set the injected userId override, if configured.
+		// Otherwise, the WorkflowExecutor will set current user.
+		if (this.userId != null && !this.userId.trim().isEmpty()) {
+			job.setUserId(userId);
+		}
+		try {
+			workflowExecutor.startExecution(job);
+		} catch (WorkflowExecutionException e) {
+			logger.error("Failed to start execution for itemId '{}': {}", job.getItemId(), e.getMessage());
+			throw new RuntimeException("Work execution failed: " + e.getMessage(), e);
+		}
 	}
 
 }

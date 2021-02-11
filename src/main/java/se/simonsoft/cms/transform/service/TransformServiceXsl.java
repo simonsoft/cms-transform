@@ -23,7 +23,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import javax.inject.Inject;
@@ -93,13 +92,12 @@ public class TransformServiceXsl implements TransformService {
 	}
 
 	@Override
-	public void transform(CmsItem item, TransformConfig config) {
+	public void transform(CmsItemId itemId, TransformConfig config) {
 		if (config == null || config.getOptions() == null) {
 			throw new IllegalArgumentException("TransformServiceXsl needs a valid TransformConfig object.");
 		}
 		
-		final CmsItem base = item;
-		final CmsItemId baseItemId = base.getId();
+		final CmsItemId baseItemId = itemId;
 		final CmsRepository repository = baseItemId.getRepository();
 		final RepoRevision baseRevision = repoLookup.getYoungest(repository);
 		final boolean overwrite = new Boolean(config.getOptions().getParams().get("overwrite"));
@@ -123,7 +121,7 @@ public class TransformServiceXsl implements TransformService {
 		transformerService.setItemLookup(itemLookup);
 		
 		final CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
-		final CmsItemPropertiesMap props = getProperties(base, config);
+		final CmsItemPropertiesMap props = getProperties(baseItemId, config);
 		
 		SaxonOutputURIResolverXdm outputURIResolver = new SaxonOutputURIResolverXdm(sourceReader);
 		TransformOptions transformOptions = new TransformOptions();
@@ -294,10 +292,9 @@ public class TransformServiceXsl implements TransformService {
 		return data.substring(data.indexOf("?>") + 2, data.length()).trim().isEmpty();
 	}
 	
-	private CmsItemPropertiesMap getProperties(CmsItem baseItem, TransformConfig config) {
+	private CmsItemPropertiesMap getProperties(CmsItemId baseId, TransformConfig config) {
 		
 		CmsItemPropertiesMap m = new CmsItemPropertiesMap();
-		CmsItemId baseId = baseItem.getId();
 		
 		// TODO: Include rev if configured to do so.
 		baseId = baseId.withPegRev(null); // Remove revision to avoid commit on items that have not changed.

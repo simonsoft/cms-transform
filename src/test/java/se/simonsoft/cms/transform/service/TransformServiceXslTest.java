@@ -26,9 +26,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
-import javax.xml.transform.Source;
-import javax.xml.transform.stream.StreamSource;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -95,7 +92,6 @@ public class TransformServiceXslTest {
 	@Test
 	public void testSingleOutputFolderDoNotExist() throws Exception {
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
-		CmsItem item = lookup.getItem(itemId);
 
 		TransformConfig config = new TransformConfig();
 		config.setActive(true);
@@ -112,7 +108,7 @@ public class TransformServiceXslTest {
 		config.setOptions(configOptions);
 
 		try {
-			transformService.transform(item, config);
+			transformService.transform(itemId, config);
 			fail("Should fail. Output is specified but the folder does not exsist.");
 		} catch (IllegalArgumentException e) {
 			assertEquals("Specified output must be an existing folder: /xml/nonexisting", e.getMessage());
@@ -122,7 +118,6 @@ public class TransformServiceXslTest {
 	@Test
 	public void testSingleOutputFolderDefaultOverwriteTrue() throws Exception {
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
-		CmsItem item = lookup.getItem(itemId);
 
 		TransformConfig config = new TransformConfig();
 		config.setActive(true);
@@ -138,7 +133,7 @@ public class TransformServiceXslTest {
 
 		config.setOptions(configOptions);
 
-		transformService.transform(item, config);
+		transformService.transform(itemId, config);
 		
 		CmsItem itemNew = lookup.getItem(itemId);
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -152,7 +147,6 @@ public class TransformServiceXslTest {
 	@Test
 	public void testSingleOutputFolderDefaultOverwriteFalse() throws Exception {
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
-		CmsItem item = lookup.getItem(itemId);
 
 		TransformConfig config = new TransformConfig();
 		config.setActive(true);
@@ -169,7 +163,7 @@ public class TransformServiceXslTest {
 		config.setOptions(configOptions);
 
 		try {
-			transformService.transform(item, config);
+			transformService.transform(itemId, config);
 			fail("Should fail, item already exist but overwrite is not set.");
 		} catch(IllegalStateException e) {
 			assertEquals("Item already exists, config prohibiting overwrite of existing items.", e.getMessage());
@@ -179,7 +173,7 @@ public class TransformServiceXslTest {
 		optionsParams.put("overwrite", "false"); // No overwrites is allowed.
 
 		try {
-			transformService.transform(item, config);
+			transformService.transform(itemId, config);
 			fail("Should fail, item already exist but overwrite is set to false.");
 		} catch(IllegalStateException e) {
 			assertEquals("Item already exists, config prohibiting overwrite of existing items.", e.getMessage());
@@ -189,7 +183,6 @@ public class TransformServiceXslTest {
 	@Test
 	public void testSingleOutputFolderExists() throws Exception {
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc).withPegRev(1L);
-		CmsItem item = lookup.getItem(itemId);
 
 		TransformConfig config = new TransformConfig();
 		config.setActive(true);
@@ -207,7 +200,7 @@ public class TransformServiceXslTest {
 		config.setOptions(configOptions);
 
 		try {
-			transformService.transform(item, config);
+			transformService.transform(itemId, config);
 		} catch (IllegalArgumentException e) {
 			fail("Output folder is valid. Should not throw exception: " + e.getMessage());
 		}
@@ -229,7 +222,6 @@ public class TransformServiceXslTest {
 	@Test
 	public void testMultipleOutputFolderDoNotExist() throws Exception {
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
-		CmsItem item = lookup.getItem(itemId);
 
 		TransformConfig config = new TransformConfig();
 		config.setActive(true);
@@ -246,7 +238,7 @@ public class TransformServiceXslTest {
 		config.setOptions(configOptions);
 
 		try {
-			transformService.transform(item, config);
+			transformService.transform(itemId, config);
 			fail("Should fail. Output is specified but the folder does not exsist.");
 		} catch (IllegalArgumentException e) {
 			assertEquals("Specified output must be an existing folder: /xml/nonexisting", e.getMessage());
@@ -256,7 +248,6 @@ public class TransformServiceXslTest {
 	@Test
 	public void testLongTruncatedComment() throws Exception {
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc).withPegRev(1L);
-		CmsItem item = lookup.getItem(itemId);
 
 		TransformConfig config = new TransformConfig();
 		config.setActive(true);
@@ -273,7 +264,7 @@ public class TransformServiceXslTest {
 
 		config.setOptions(configOptions);
 
-		transformService.transform(item, config);
+		transformService.transform(itemId, config);
 		
 		CmsItemId itemIdNew = new CmsItemIdArg(repo, new CmsItemPath(optionsParams.get("output")).append(itemId.getRelPath().getName()));
 		CmsItem itemNew = lookup.getItem(itemIdNew);
@@ -288,7 +279,6 @@ public class TransformServiceXslTest {
 	@Test
 	public void testMultipleOutputFolderDefaultOverwriteTrue() throws Exception {
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
-		CmsItem item = lookup.getItem(itemId);
 
 		TransformConfig config = new TransformConfig();
 		config.setActive(true);
@@ -304,7 +294,7 @@ public class TransformServiceXslTest {
 
 		config.setOptions(configOptions);
 
-		transformService.transform(item, config);
+		transformService.transform(itemId, config);
 		
 		CmsItem itemNew = lookup.getItem(itemId);
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -352,7 +342,6 @@ public class TransformServiceXslTest {
 	@Test
 	public void testMultipleOutputFolderDefaultOverwriteFalse() throws Exception {
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
-		CmsItem item = lookup.getItem(itemId);
 
 		TransformConfig config = new TransformConfig();
 		config.setActive(true);
@@ -369,7 +358,7 @@ public class TransformServiceXslTest {
 		config.setOptions(configOptions);
 
 		try {
-			transformService.transform(item, config);
+			transformService.transform(itemId, config);
 			fail("Should fail, item already exist but overwrite is set to false.");
 		} catch(IllegalStateException e) {
 			assertEquals("Item already exists, config prohibiting overwrite of existing items.", e.getMessage());
@@ -379,7 +368,7 @@ public class TransformServiceXslTest {
 		optionsParams.put("overwrite", "false"); // No overwrites is allowed.
 
 		try {
-			transformService.transform(item, config);
+			transformService.transform(itemId, config);
 			fail("Should fail, item already exist but overwrite is set to false.");
 		} catch(IllegalStateException e) {
 			assertEquals("Item already exists, config prohibiting overwrite of existing items.", e.getMessage());
@@ -389,7 +378,6 @@ public class TransformServiceXslTest {
 	@Test
 	public void testMultipleOutputAllItemsExists() throws Exception {
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
-		CmsItem item = lookup.getItem(itemId);
 
 		TransformConfig config = new TransformConfig();
 		config.setActive(true);
@@ -406,7 +394,7 @@ public class TransformServiceXslTest {
 
 		config.setOptions(configOptions);
 
-		transformService.transform(item, config);
+		transformService.transform(itemId, config);
 		
 		String outputPath = optionsParams.get("output");
 		
@@ -432,7 +420,6 @@ public class TransformServiceXslTest {
 	@Test
 	public void testOutputWithEncodedHref() throws Exception {
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
-		CmsItem item = lookup.getItem(itemId);
 
 		TransformConfig config = new TransformConfig();
 		config.setActive(true);
@@ -449,7 +436,7 @@ public class TransformServiceXslTest {
 
 		config.setOptions(configOptions);
 
-		transformService.transform(item, config);
+		transformService.transform(itemId, config);
 		
 		String outputPath = optionsParams.get("output");
 		
@@ -468,7 +455,6 @@ public class TransformServiceXslTest {
 	public void testTransformerServiceCmsBuiltIn() throws Exception {
 		
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
-		CmsItem item = lookup.getItem(itemId);
 
 		TransformConfig config = new TransformConfig();
 		config.setActive(true);
@@ -485,7 +471,7 @@ public class TransformServiceXslTest {
 
 		config.setOptions(configOptions);
 
-		transformService.transform(item, config);
+		transformService.transform(itemId, config);
 		
 		String outputPath = optionsParams.get("output");
 		
@@ -513,10 +499,9 @@ public class TransformServiceXslTest {
 	public void testInvalidConfig() throws Exception {
 		
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
-		CmsItem item = lookup.getItem(itemId);
 		
 		try {
-			transformService.transform(item, null);
+			transformService.transform(itemId, null);
 		} catch (IllegalArgumentException e) {
 			assertEquals("TransformServiceXsl needs a valid TransformConfig object.", e.getMessage());
 		}
@@ -525,7 +510,7 @@ public class TransformServiceXslTest {
 		config.setActive(true);
 		
 		try {
-			transformService.transform(item, config);
+			transformService.transform(itemId, config);
 		} catch (IllegalArgumentException e) {
 			assertEquals("TransformServiceXsl needs a valid TransformConfig object.", e.getMessage());
 		}
@@ -535,7 +520,6 @@ public class TransformServiceXslTest {
 	public void testMissingTransformerService() throws Exception {
 		
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
-		CmsItem item = lookup.getItem(itemId);
 		
 		TransformConfig config = new TransformConfig();
 		config.setActive(true);
@@ -553,7 +537,7 @@ public class TransformServiceXslTest {
 		config.setOptions(configOptions);
 		
 		try {
-			transformService.transform(item, config);
+			transformService.transform(itemId, config);
 		} catch (IllegalArgumentException e) {
 			assertEquals("No built-in stylesheet named: non-existing.xsl", e.getMessage());
 		}
@@ -561,7 +545,7 @@ public class TransformServiceXslTest {
 		optionsParams.put("stylesheet", "/non/existing.xsl");
 		
 		try {
-			transformService.transform(item, config);
+			transformService.transform(itemId, config);
 		} catch (IllegalArgumentException e) {
 			assertEquals("Specified stylesheet does not exist at path: /non/existing.xsl", e.getMessage());
 		}
@@ -593,7 +577,7 @@ public class TransformServiceXslTest {
 		config.setOptions(configOptions);
 		
 		try {
-			transformService.transform(item, config);
+			transformService.transform(itemId, config);
 			fail("Should result in empty changeset and backend-filexml will not accept that.");
 		} catch (IllegalArgumentException e) {
 			assertEquals("Filexml backend does not support empty changeset (patchset resulted in empty changeset).", e.getMessage());

@@ -29,7 +29,6 @@ import java.util.Map;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
@@ -44,10 +43,12 @@ import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
+import se.simonsoft.cms.item.workflow.WorkflowExecutionException;
+import se.simonsoft.cms.item.workflow.WorkflowExecutor;
+import se.simonsoft.cms.item.workflow.WorkflowItemInput;
 import se.simonsoft.cms.transform.config.TransformConfiguration;
 import se.simonsoft.cms.transform.config.TransformConfigurationDefault;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
-import se.simonsoft.cms.transform.service.TransformService;
 import se.simonsoft.cms.transform.testconfig.TestFileXmlSetUp;
 
 public class TransformItemChangedEventListenerTest {
@@ -65,6 +66,7 @@ public class TransformItemChangedEventListenerTest {
 	private static CmsRepositoryLookup repoLookup;
 	private static TransformConfiguration transformConfig;
 	private Map<CmsRepository, CmsItemLookup> lookups = new HashMap<>();
+	private String userId = null;
 
 	static Long startRev = new Long(1); // Defined as youngest in the filexml repo.
 
@@ -91,18 +93,16 @@ public class TransformItemChangedEventListenerTest {
 	
 	
 	@Test
-	public void testEventListenerGetsConfigs() {
-		
-		TransformService spyTransformService = spy(TransformService.class);
-		Map<CmsRepository, TransformService> transformServices = new HashMap<CmsRepository, TransformService>();
-		transformServices.put(repo, spyTransformService);
+	public void testEventListenerGetsConfigs() throws WorkflowExecutionException {
 		
 		TransformConfiguration spyTransformConfig = spy(transformConfig);
+		WorkflowExecutor<WorkflowItemInput> spyWfExec = spy(WorkflowExecutor.class);
+		
 		
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc).withPegRev(1L);
 		CmsItem item = lookup.getItem(itemId);
 		
-		TransformItemChangedEventListener eventListener = new TransformItemChangedEventListener(spyTransformConfig, transformServices, lookups);
+		TransformItemChangedEventListener eventListener = new TransformItemChangedEventListener(spyTransformConfig, lookups, userId, spyWfExec);
 		eventListener.onItemChange(item);
 		
 		ArgumentCaptor<CmsItemId> itemIdCaptor = ArgumentCaptor.forClass(CmsItemId.class);
@@ -111,29 +111,27 @@ public class TransformItemChangedEventListenerTest {
 		CmsItemId value = itemIdCaptor.getValue();
 		assertEquals(itemId, value);
 		
-		ArgumentCaptor<TransformConfig> argCaptorConfig = ArgumentCaptor.forClass(TransformConfig.class);
-		verify(spyTransformService, times(2)).transform(Mockito.any(CmsItem.class), argCaptorConfig.capture());
+		ArgumentCaptor<WorkflowItemInput> argCaptorConfig = ArgumentCaptor.forClass(WorkflowItemInput.class);
+		verify(spyWfExec, times(2)).startExecution(argCaptorConfig.capture());
 		
-		List<TransformConfig> allConfigs = argCaptorConfig.getAllValues();
-		Collections.sort(allConfigs, new ConfigComparator());
+		List<WorkflowItemInput> allConfigs = argCaptorConfig.getAllValues();
+		Collections.sort(allConfigs, new WfInputComparator());
 		assertEquals(2, allConfigs.size());
-		assertEquals("multiple", allConfigs.get(0).getName());
-		assertEquals("single", allConfigs.get(1).getName());
+		assertEquals("multiple", ((TransformItemWorkflowInput) allConfigs.get(0)).getOptions().getName());
+		assertEquals("single", ((TransformItemWorkflowInput) allConfigs.get(1)).getOptions().getName());
 	}
 	
 	@Test
 	public void testFailsIfNoPegrev() {
 		
-		TransformService spyTransformService = spy(TransformService.class);
-		Map<CmsRepository, TransformService> transformServices = new HashMap<CmsRepository, TransformService>();
-		transformServices.put(repo, spyTransformService);
-		
 		TransformConfiguration spyTransformConfig = spy(transformConfig);
+		WorkflowExecutor<WorkflowItemInput> spyWfExec = spy(WorkflowExecutor.class);
+
 		
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
 		CmsItem item = lookup.getItem(itemId);
 		
-		TransformItemChangedEventListener eventListener = new TransformItemChangedEventListener(spyTransformConfig, transformServices, lookups);
+		TransformItemChangedEventListener eventListener = new TransformItemChangedEventListener(spyTransformConfig, lookups, userId, spyWfExec);
 		try {
 			eventListener.onItemChange(item);
 			fail("Should fail");
@@ -144,41 +142,35 @@ public class TransformItemChangedEventListenerTest {
 	
 	
 	@Test
-	public void testFolderInputNoTransform() {
-		TransformService spyTransformService = spy(TransformService.class);
-		Map<CmsRepository, TransformService> transformServices = new HashMap<CmsRepository, TransformService>();
-		transformServices.put(repo, spyTransformService);
-		
+	public void testFolderInputNoTransform() throws WorkflowExecutionException {
 		TransformConfiguration spyTransformConfig = spy(transformConfig);
+		WorkflowExecutor<WorkflowItemInput> spyWfExec = spy(WorkflowExecutor.class);
 		
 		CmsItemId itemIdFolder = new CmsItemIdArg("x-svn:///svn/repo1/doc").withPegRev(1L);
 		CmsItem item = lookup.getItem(itemIdFolder);
 		
-		TransformItemChangedEventListener eventListener = new TransformItemChangedEventListener(spyTransformConfig, transformServices, lookups);
+		TransformItemChangedEventListener eventListener = new TransformItemChangedEventListener(spyTransformConfig, lookups, userId, spyWfExec);
 		eventListener.onItemChange(item);
 		
 		verify(spyTransformConfig, times(0)).getConfiguration(Mockito.any(CmsItemId.class));
-		verify(spyTransformService, times(0)).transform(Mockito.any(CmsItem.class), Mockito.any(TransformConfig.class));
+		verify(spyWfExec, times(0)).startExecution(Mockito.any(WorkflowItemInput.class));
 	}
 	
 	@Test
-	public void testItemNotWithinWhitelist() {
+	public void testItemNotWithinWhitelist() throws WorkflowExecutionException {
 		//Repository config white lists /doc and /transformed/single
 		
-		TransformService spyTransformService = spy(TransformService.class);
-		Map<CmsRepository, TransformService> transformServices = new HashMap<CmsRepository, TransformService>();
-		transformServices.put(repo, spyTransformService);
-		
 		TransformConfiguration spyTransformConfig = spy(transformConfig);
+		WorkflowExecutor<WorkflowItemInput> spyWfExec = spy(WorkflowExecutor.class);
 		
 		CmsItemId itemIdFolder = new CmsItemIdArg("x-svn:///svn/repo1/transformed/multiple/existing/section1.xml").withPegRev(1L);
 		CmsItem item = lookup.getItem(itemIdFolder);
 		
-		TransformItemChangedEventListener eventListener = new TransformItemChangedEventListener(spyTransformConfig, transformServices, lookups);
+		TransformItemChangedEventListener eventListener = new TransformItemChangedEventListener(spyTransformConfig, lookups, userId, spyWfExec);
 		eventListener.onItemChange(item);
 		
 		verify(spyTransformConfig, times(0)).getConfiguration(Mockito.any(CmsItemId.class));
-		verify(spyTransformService, times(0)).transform(Mockito.any(CmsItem.class), Mockito.any(TransformConfig.class));
+		verify(spyWfExec, times(0)).startExecution(Mockito.any(WorkflowItemInput.class));
 		
 	}
 	
@@ -188,6 +180,15 @@ public class TransformItemChangedEventListenerTest {
 		@Override
 		public int compare(TransformConfig o1, TransformConfig o2) {
 			return o1.getName().compareTo(o2.getName());
+		}
+
+	}
+	
+	public class WfInputComparator implements Comparator<WorkflowItemInput> {
+
+		@Override
+		public int compare(WorkflowItemInput o1, WorkflowItemInput o2) {
+			return ((TransformConfig) o1.getOptions()).getName().compareTo(((TransformConfig) o2.getOptions()).getName());
 		}
 
 	}
