@@ -23,7 +23,7 @@
 	xmlns:xi="http://www.w3.org/2001/XInclude"
 	xmlns:cms="http://www.simonsoft.se/namespace/cms"
 	xmlns:cmsfn="http://www.simonsoft.se/namespace/cms-functions"
-	version="2.0">
+	version="3.0">
 	
 	<!-- Caller can request omitting the declaration, e.g. when storing in a property. -->
 	<xsl:param name="omit-xml-declaration" select="'no'"/>
