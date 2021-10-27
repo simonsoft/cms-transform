@@ -15,11 +15,24 @@
  */
 package se.simonsoft.cms.transform.testconfig;
 
-import javax.xml.transform.Source;
-import javax.xml.transform.stream.StreamSource;
+import java.util.Map;
 
 import com.google.inject.AbstractModule;
-import com.google.inject.multibindings.MapBinder;
+import com.google.inject.multibindings.Multibinder;
+
+import net.sf.saxon.lib.ExtensionFunctionDefinition;
+import net.sf.saxon.s9api.Processor;
+import se.repos.indexing.IndexingItemHandler;
+import se.simonsoft.cms.xmlsource.SaxonConfiguration;
+import se.simonsoft.cms.xmlsource.handler.XmlSourceReader;
+import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceReaderS9api;
+import se.simonsoft.cms.xmlsource.transform.TransformStylesheetSource;
+import se.simonsoft.cms.xmlsource.transform.TransformStylesheetSourceConfig;
+import se.simonsoft.cms.xmlsource.transform.TransformerServiceFactory;
+import se.simonsoft.cms.xmlsource.transform.function.GetChecksum;
+import se.simonsoft.cms.xmlsource.transform.function.GetLogicalId;
+import se.simonsoft.cms.xmlsource.transform.function.GetPegRev;
+import se.simonsoft.cms.xmlsource.transform.function.WithPegRev;
 
 public class TestTransformModule extends AbstractModule{
 
@@ -28,11 +41,21 @@ public class TestTransformModule extends AbstractModule{
 
 	@Override
 	protected void configure() {
-		MapBinder<String, Source> sourceBinder = MapBinder.newMapBinder(binder(), String.class, Source.class);
-		//sourceBinder.addBinding("identity.xsl").toInstance(new StreamSource(this.getClass().getClassLoader().getResourceAsStream("se/simonsoft/cms/xmlsource/transform/identity.xsl")));
+		bind(Processor.class).toProvider(SaxonConfiguration.class);
+		Multibinder<ExtensionFunctionDefinition> transformerFunctions = Multibinder.newSetBinder(binder(), ExtensionFunctionDefinition.class);
+		transformerFunctions.addBinding().to(GetChecksum.class);
+		transformerFunctions.addBinding().to(GetPegRev.class);
+		transformerFunctions.addBinding().to(WithPegRev.class);
+		transformerFunctions.addBinding().to(GetLogicalId.class);
+		bind(XmlSourceReader.class).to(XmlSourceReaderS9api.class);
+
+		Map<String, String> stylesheets = TransformerServiceFactory.getStylesheetsForTestingMap();
 		// Just for cms-transform testing.
-		sourceBinder.addBinding("transform-multiple-output.xsl").toInstance(new StreamSource(this.getClass().getClassLoader().getResourceAsStream("se/simonsoft/cms/transform/datasets/repo1/stylesheet/transform-multiple-output.xsl")));
-		sourceBinder.addBinding("transform-single-output.xsl").toInstance(new StreamSource(this.getClass().getClassLoader().getResourceAsStream("se/simonsoft/cms/transform/datasets/repo1/stylesheet/transform-single-output.xsl")));
+		stylesheets.put("transform-multiple-output.xsl", "se/simonsoft/cms/transform/datasets/repo1/stylesheet/transform-multiple-output.xsl");
+		stylesheets.put("transform-single-output.xsl", "se/simonsoft/cms/transform/datasets/repo1/stylesheet/transform-single-output.xsl");
+		bind(TransformStylesheetSource.class).toInstance(new TransformStylesheetSourceConfig(stylesheets));
+		
+		Multibinder<IndexingItemHandler> handlers = Multibinder.newSetBinder(binder(), IndexingItemHandler.class);
 	}
 
 }

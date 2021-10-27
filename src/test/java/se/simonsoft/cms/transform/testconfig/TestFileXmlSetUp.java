@@ -21,7 +21,8 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import se.repos.indexing.standalone.config.IndexingHandlersModuleXml;
+import com.google.inject.Injector;
+
 import se.repos.testing.indexing.ReposTestIndexing;
 import se.repos.testing.indexing.TestIndexOptions;
 import se.simonsoft.cms.backend.filexml.CmsRepositoryFilexml;
@@ -45,9 +46,9 @@ public class TestFileXmlSetUp {
 
 	public void setUpIndexing() {
 		TestIndexOptions indexOptions = new TestIndexOptions().itemDefaultServices()
-				.addCore("reposxml", "se/simonsoft/cms/indexing/xml/solr/reposxml/**")
-				.addModule(new TestTransformModule())
-				.addModule(new IndexingHandlersModuleXml());
+				//.addCore("reposxml", "se/simonsoft/cms/indexing/xml/solr/reposxml/**")
+				.addModule(new TestTransformModule());
+				//.addModule(new IndexingHandlersModuleXml());
 			
 		indexing = ReposTestIndexing.getInstance(indexOptions);
 	}
@@ -83,6 +84,10 @@ public class TestFileXmlSetUp {
 		if (this.indexing == null) throw new IllegalStateException("FilexmlSourceClasspath is null, you have to run STestFilexmlSetUp.setUp()");
 
 		return this.indexing;
+	}
+	
+	public Injector getContext() {
+		return indexing.getContext();
 	}
 
 	public CmsRepository getRepo() {
