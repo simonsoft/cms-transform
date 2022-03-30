@@ -39,7 +39,12 @@ public class TransformCommandHandler implements ExternalCommandHandler<Transform
 	public TransformCommandHandler(Map<CmsRepository, TransformService> transformServiceMap) {
 		this.transformServiceMap = transformServiceMap;
 	}
-
+	
+	@Override
+	public Class<TransformConfig> getArgumentsClass() {
+		return TransformConfig.class;
+	}
+	
 	@Override
 	public String handleExternalCommand(CmsItemId item, TransformConfig arguments) {
 		
