@@ -107,7 +107,7 @@ public class TransformServiceXsl implements TransformService {
 		final CmsItemId baseItemId = itemId;
 		final CmsRepository repository = baseItemId.getRepository();
 		final RepoRevision baseRevision = repoLookup.getYoungest(repository);
-		final boolean overwrite = new Boolean(config.getOptions().getParams().get("overwrite"));
+		final boolean overwrite = Boolean.valueOf(config.getOptions().getParams().get("overwrite"));
 		
 		if (!config.getOptions().getType().equals("xsl")) {
 			throw new IllegalArgumentException("TransformServiceXsl can only handle xsl transforms but was given: " + config.getOptions().getType());
