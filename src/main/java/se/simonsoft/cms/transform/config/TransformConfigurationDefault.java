@@ -76,7 +76,7 @@ public class TransformConfigurationDefault implements TransformConfiguration {
 	}
 
 	private Map<String, TransformConfig> deserializeConfig(CmsResourceContext context) {
-		logger.debug("Starting deserialization of configs with namespace {}...", TRANSFORM_CONFIG_NAMESPACE);
+		logger.trace("Starting deserialization of configs with namespace {}...", TRANSFORM_CONFIG_NAMESPACE);
 		
 		Map<String, TransformConfig> configs = new LinkedHashMap<>();
 		
@@ -93,6 +93,7 @@ public class TransformConfigurationDefault implements TransformConfiguration {
 			}
 		}
 		
+		logger.debug("Context had {} valid {} objects", configs.size(), TRANSFORM_CONFIG_NAMESPACE);
 		return configs;
 	}
 }
