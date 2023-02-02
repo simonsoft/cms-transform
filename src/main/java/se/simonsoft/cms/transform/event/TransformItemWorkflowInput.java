@@ -16,6 +16,7 @@
 package se.simonsoft.cms.transform.event;
 
 import com.fasterxml.jackson.annotation.JsonGetter;
+import com.fasterxml.jackson.annotation.JsonSetter;
 
 import se.simonsoft.cms.item.CmsItemId;
 import se.simonsoft.cms.item.workflow.WorkflowItemInputUserId;
@@ -27,6 +28,7 @@ class TransformItemWorkflowInput implements WorkflowItemInputUserId {
 	// Using TransformConfig instead of TransformConfigOptions is inconsistent but the service needs the "name" parameter.
 	private final TransformConfig options;
 	private String userId;
+	private String userRoles;
 
 	public TransformItemWorkflowInput(CmsItemId itemId, TransformConfig options) {
 		this.itemId = itemId;
@@ -51,6 +53,7 @@ class TransformItemWorkflowInput implements WorkflowItemInputUserId {
 	}
 
 	@Override
+	@JsonSetter("userid")
 	public void setUserId(String userId) {
 		this.userId = userId;
 	}
@@ -58,6 +61,18 @@ class TransformItemWorkflowInput implements WorkflowItemInputUserId {
 	@Override
 	public TransformConfig getOptions() {
 		return options;
+	}
+
+	@Override
+	@JsonGetter("userroles") // Defined by the interface if the writer configure forType(WorkflowItemInputUserId.class). 
+	public String getUserRoles() {
+		return this.userRoles;
+	}
+
+	@Override
+	@JsonSetter("userroles")
+	public void setUserRoles(String userRoles) {
+		this.userRoles = userRoles;
 	}
 
 }
