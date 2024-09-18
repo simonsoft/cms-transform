@@ -139,6 +139,7 @@ public class TransformServiceXsl implements TransformService {
 		if (item.getKind() == CmsItemKind.Folder) {
 			Set<CmsItemId> files = itemLookup.getImmediateFiles(baseItemId);
 			// TODO: Consider filtering based on CmsItemClassificationXml in combination with tikahtml cms:class.
+			logger.info("Transforming {} items in folder: {}", files.size(), baseItemId);
 			items.addAll(files);
 		} else {
 			items.add(baseItemId);
@@ -160,6 +161,7 @@ public class TransformServiceXsl implements TransformService {
 	
 	private void transformItem(CmsItemId baseItemId, TransformConfig config, TransformerService transformerService, TransformOptions transformOptions, CmsPatchset patchset) {
 		
+		logger.debug("Transforming itemid: {}", baseItemId);
 		final CmsItemPropertiesMap props = getProperties(baseItemId, config);
 		final CmsItemPath outputPath = getOutputPath(baseItemId, config.getOptions().getParams().get("output"));
 		final boolean overwrite = Boolean.valueOf(config.getOptions().getParams().get("overwrite"));
