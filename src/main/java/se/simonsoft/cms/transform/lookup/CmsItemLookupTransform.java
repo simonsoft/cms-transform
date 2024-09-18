@@ -53,12 +53,12 @@ public class CmsItemLookupTransform implements CmsItemLookup {
 		CmsItemProperties properties = item.getProperties();
 		
 		if (!hasClass(properties)) {
-			//If it is not a keydefmap we just return item as is.
+			//If it is not tikahtml we just return item as is.
 			logger.trace("Not an extracted Keydefmap: {}", id);
 			return item;
 		}
 		
-		logger.debug("Resolving extracted Keydefmap: {}", id);
+		logger.debug("Resolving extracted Tika XHTML: {}", id);
 		CmsItemReporting reportingItem = (CmsItemReporting) this.itemLookupReporting.getItem(id);
 		return new CmsItemTransform(reportingItem);
 	}
