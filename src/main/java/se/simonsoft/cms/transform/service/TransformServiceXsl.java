@@ -140,7 +140,9 @@ public class TransformServiceXsl implements TransformService {
 			Set<CmsItemId> files = itemLookup.getImmediateFiles(baseItemId);
 			// TODO: Consider filtering based on CmsItemClassificationXml in combination with tikahtml cms:class.
 			logger.info("Transforming {} items in folder: {}", files.size(), baseItemId);
-			items.addAll(files);
+			// Workaround for backend returning itemIds with p=-1, remove when fixed in backend. 
+			// Never transforms non-head anyway.
+			files.forEach(fileId -> items.add(fileId.withPegRev(null)));
 		} else {
 			items.add(baseItemId);
 		}
