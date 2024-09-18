@@ -22,6 +22,7 @@ import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -33,6 +34,7 @@ import org.slf4j.LoggerFactory;
 
 import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
+import se.simonsoft.cms.item.CmsItemKind;
 import se.simonsoft.cms.item.CmsItemLockCollection;
 import se.simonsoft.cms.item.CmsItemPath;
 import se.simonsoft.cms.item.CmsRepository;
@@ -62,6 +64,7 @@ public class TransformServiceXsl implements TransformService {
 	
 	private final CmsCommit commit;
 	private final CmsItemLookup itemLookup;
+	@SuppressWarnings("unused")
 	private final CmsItemLookupReporting itemLookupReporting;
 	private final CmsItemLookup itemLookupTransform;
 	private final TransformerServiceFactory transformerServiceFactory;
@@ -107,7 +110,6 @@ public class TransformServiceXsl implements TransformService {
 		final CmsItemId baseItemId = itemId;
 		final CmsRepository repository = baseItemId.getRepository();
 		final RepoRevision baseRevision = repoLookup.getYoungest(repository);
-		final boolean overwrite = Boolean.valueOf(config.getOptions().getParams().get("overwrite"));
 		
 		if (!config.getOptions().getType().equals("xsl")) {
 			throw new IllegalArgumentException("TransformServiceXsl can only handle xsl transforms but was given: " + config.getOptions().getType());
@@ -123,16 +125,46 @@ public class TransformServiceXsl implements TransformService {
 			throw new IllegalArgumentException("Specified output must be an existing folder: " + outputPath.getPath());
 		}
 		
+		CmsItem item = itemLookup.getItem(baseItemId);
+		
 		final TransformerService transformerService = getTransformerService(baseItemId, stylesheet);
 		
 		// CmsItemLookupTransform will capture items with specific class, normal items will resolve via normal CmsItemLookup.
 		transformerService.setItemLookup(itemLookupTransform);
 		
 		final CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
+		TransformOptions transformOptions = new TransformOptions();
+		
+		Set<CmsItemId> items = new LinkedHashSet<>();
+		if (item.getKind() == CmsItemKind.Folder) {
+			Set<CmsItemId> files = itemLookup.getImmediateFiles(baseItemId);
+			// TODO: Consider filtering based on CmsItemClassificationXml in combination with tikahtml cms:class.
+			items.addAll(files);
+		} else {
+			items.add(baseItemId);
+		}
+		
+		for (CmsItemId id: items) {
+			transformItem(id, config, transformerService, transformOptions, patchset);
+		}
+		
+		List<String> messages = transformOptions.getMessageListener().getMessages();
+		String completeMessage = getCompleteMessageString(config.getOptions().getParams().get("comment"), messages);
+		if (completeMessage != null && !completeMessage.trim().isEmpty()) {
+			patchset.setHistoryMessage(completeMessage);
+		}
+		
+		RepoRevision r = commit.run(patchset);
+		logger.debug("Transform complete, commited with rev: {}", r.getNumber());
+	}
+	
+	private void transformItem(CmsItemId baseItemId, TransformConfig config, TransformerService transformerService, TransformOptions transformOptions, CmsPatchset patchset) {
+		
 		final CmsItemPropertiesMap props = getProperties(baseItemId, config);
+		final CmsItemPath outputPath = getOutputPath(baseItemId, config.getOptions().getParams().get("output"));
+		final boolean overwrite = Boolean.valueOf(config.getOptions().getParams().get("overwrite"));
 		
 		SaxonOutputURIResolverXdm outputURIResolver = new SaxonOutputURIResolverXdm(sourceReader);
-		TransformOptions transformOptions = new TransformOptions();
 		transformOptions.setOutputURIResolver(outputURIResolver);
 		
 		TransformStreamProvider baseStreamProvider = transformerService.getTransformStreamProvider(baseItemId, transformOptions);
@@ -151,15 +183,6 @@ public class TransformServiceXsl implements TransformService {
 			CmsItemPath path = outputPath.append(Arrays.asList(decodedHref.split("/")));
 			addToPatchset(patchset, path, streamProvider, overwrite, props);
 		}
-		
-		List<String> messages = transformOptions.getMessageListener().getMessages();
-		String completeMessage = getCompleteMessageString(config.getOptions().getParams().get("comment"), messages);
-		if (completeMessage != null && !completeMessage.trim().isEmpty()) {
-			patchset.setHistoryMessage(completeMessage);
-		}
-		
-		RepoRevision r = commit.run(patchset);
-		logger.debug("Transform complete, commited with rev: {}", r.getNumber());
 	}
 	
 	private String getCompleteMessageString(String comment, List<String> messages) {
