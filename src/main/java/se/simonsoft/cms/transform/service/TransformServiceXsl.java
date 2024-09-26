@@ -144,7 +144,7 @@ public class TransformServiceXsl implements TransformService {
 			// Filtering based on CmsItemClassificationXml in combination with tikahtml cms:class.
 			// Workaround for backend returning itemIds with p=-1, remove when fixed in backend. 
 			// Never transforms non-head anyway.
-			files.stream().filter(fileId -> isTransformable(baseItemId)).forEach(fileId -> items.add(fileId.withPegRev(null)));
+			files.stream().filter(fileId -> isTransformable(fileId)).forEach(fileId -> items.add(fileId.withPegRev(null)));
 		} else {
 			items.add(baseItemId);
 		}
