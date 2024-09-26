@@ -25,7 +25,6 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 import javax.xml.transform.stream.StreamSource;
@@ -345,12 +344,15 @@ public class TransformServiceXsl implements TransformService {
 	private CmsItemPropertiesMap getProperties(CmsItemId baseId, TransformConfig config) {
 		
 		CmsItemPropertiesMap m = new CmsItemPropertiesMap();
+		final boolean propertiesSuppress = Boolean.valueOf(config.getOptions().getParams().get("PropertiesSuppress"));
 		
 		// TODO: Include rev if configured to do so.
 		baseId = baseId.withPegRev(null); // Remove revision to avoid commit on items that have not changed.
 		
-		m.put(TRANSFORM_BASE_PROP_KEY, baseId.getLogicalId());
-		m.put(TRANSFORM_NAME_PROP_KEY, config.getName());
+		if (!propertiesSuppress) {
+			m.put(TRANSFORM_BASE_PROP_KEY, baseId.getLogicalId());
+			m.put(TRANSFORM_NAME_PROP_KEY, config.getName());
+		}
 		return m;
 	}
 	
