@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 import javax.xml.transform.stream.StreamSource;
@@ -48,7 +49,9 @@ import se.simonsoft.cms.item.commit.FolderExist;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsItemNotFoundException;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
+import se.simonsoft.cms.item.properties.CmsItemProperties;
 import se.simonsoft.cms.item.properties.CmsItemPropertiesMap;
+import se.simonsoft.cms.item.structure.CmsItemClassificationXml;
 import se.simonsoft.cms.reporting.CmsItemLookupReporting;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.transform.lookup.CmsItemLookupTransform;
@@ -138,11 +141,11 @@ public class TransformServiceXsl implements TransformService {
 		Set<CmsItemId> items = new LinkedHashSet<>();
 		if (item.getKind() == CmsItemKind.Folder) {
 			Set<CmsItemId> files = itemLookup.getImmediateFiles(baseItemId);
-			// TODO: Consider filtering based on CmsItemClassificationXml in combination with tikahtml cms:class.
 			logger.info("Transforming {} items in folder: {}", files.size(), baseItemId);
+			// Filtering based on CmsItemClassificationXml in combination with tikahtml cms:class.
 			// Workaround for backend returning itemIds with p=-1, remove when fixed in backend. 
 			// Never transforms non-head anyway.
-			files.forEach(fileId -> items.add(fileId.withPegRev(null)));
+			files.stream().filter(fileId -> isTransformable(baseItemId)).forEach(fileId -> items.add(fileId.withPegRev(null)));
 		} else {
 			items.add(baseItemId);
 		}
@@ -159,6 +162,20 @@ public class TransformServiceXsl implements TransformService {
 		
 		RepoRevision r = commit.run(patchset);
 		logger.debug("Transform complete, commited with rev: {}", r.getNumber());
+	}
+	
+	private boolean isTransformable(CmsItemId itemId) {
+		
+		CmsItemClassificationXml classification = new CmsItemClassificationXml();
+		if (classification.isXml(itemId)) {
+			return true;
+		}
+		CmsItem item = this.itemLookup.getItem(itemId);
+		// TODO: Use cms-item method when available.
+		if (isCmsClass(item.getProperties(), "tikahtml")) {
+			return true;
+		}
+		return false;
 	}
 	
 	private void transformItem(CmsItemId baseItemId, TransformConfig config, TransformerService transformerService, TransformOptions transformOptions, CmsPatchset patchset) {
@@ -361,6 +378,21 @@ public class TransformServiceXsl implements TransformService {
 			throw new IllegalArgumentException("Could not decode URL: " + href);
 		}
 		return href;
+	}
+	
+	private static boolean isCmsClass(CmsItemProperties properties, String cmsClass) {
+
+		if (properties == null) {
+			return false;
+		}
+
+		String classes = properties.getString("cms:class");
+		if (classes == null || classes.isEmpty()) {
+			return false;
+		}
+		
+		String[] a = classes.split(" ");
+		return Arrays.asList(a).contains(cmsClass);
 	}
 	
 	private class EmptyStreamException extends Exception {
