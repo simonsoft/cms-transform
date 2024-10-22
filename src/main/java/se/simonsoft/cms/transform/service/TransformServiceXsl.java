@@ -157,10 +157,11 @@ public class TransformServiceXsl implements TransformService {
 			for (CmsItemId id: items) {
 				locked.addAll(transformItem(id, config, transformerService, transformOptions, patchset));
 			}
-		} catch (Exception e) {
+		} catch (RuntimeException e) {
 			logger.warn("Failed to transform / lock items: {}", e.getMessage(), e);
 			// Release all locks taken by previous iterations of the loop.
 			unlockItemsFailure(locked);
+			throw e;
 		}
 		
 		List<String> messages = transformOptions.getMessageListener().getMessages();
@@ -187,7 +188,7 @@ public class TransformServiceXsl implements TransformService {
 		return false;
 	}
 	
-	private Set<CmsItemLock> transformItem(CmsItemId baseItemId, TransformConfig config, TransformerService transformerService, TransformOptions transformOptions, CmsPatchset patchset) throws Exception {
+	private Set<CmsItemLock> transformItem(CmsItemId baseItemId, TransformConfig config, TransformerService transformerService, TransformOptions transformOptions, CmsPatchset patchset) {
 		
 		logger.debug("Transforming itemid: {}", baseItemId);
 		final CmsItemPropertiesMap props = getProperties(baseItemId, config);
@@ -216,7 +217,7 @@ public class TransformServiceXsl implements TransformService {
 				CmsItemPath path = outputPath.append(Arrays.asList(decodedHref.split("/")));
 				locked.add(addToPatchset(patchset, path, streamProvider, overwrite, props));
 			}
-		} catch (Exception e) {
+		} catch (RuntimeException e) {
 			// Unlock locks taken in this invocation of transformItem.
 			unlockItemsFailure(locked);
 			throw e;
