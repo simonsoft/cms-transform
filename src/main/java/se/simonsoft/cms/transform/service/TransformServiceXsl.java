@@ -226,7 +226,7 @@ public class TransformServiceXsl implements TransformService {
 	}
 	
 	private void unlockItemsFailure(Set<CmsItemLock> locked) {
-		
+		logger.info("Transform failed, unlocking {} items.", locked.size());
 		try {
 			this.commit.unlock(locked.toArray(new CmsItemLock[0]));
 		} catch (Exception e) {
