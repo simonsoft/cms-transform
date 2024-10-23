@@ -21,6 +21,7 @@ import java.io.PushbackInputStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -35,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
 import se.simonsoft.cms.item.CmsItemKind;
+import se.simonsoft.cms.item.CmsItemLock;
 import se.simonsoft.cms.item.CmsItemLockCollection;
 import se.simonsoft.cms.item.CmsItemPath;
 import se.simonsoft.cms.item.CmsRepository;
@@ -149,8 +151,17 @@ public class TransformServiceXsl implements TransformService {
 			items.add(baseItemId);
 		}
 		
-		for (CmsItemId id: items) {
-			transformItem(id, config, transformerService, transformOptions, patchset);
+		// Locked items can be any items in the repository (any number), not just the input items.
+		final Set<CmsItemLock> locked = new HashSet<>();
+		try {
+			for (CmsItemId id: items) {
+				locked.addAll(transformItem(id, config, transformerService, transformOptions, patchset));
+			}
+		} catch (RuntimeException e) {
+			logger.warn("Failed to transform / lock items: {}", e.getMessage(), e);
+			// Release all locks taken by previous iterations of the loop.
+			unlockItemsFailure(locked);
+			throw e;
 		}
 		
 		List<String> messages = transformOptions.getMessageListener().getMessages();
@@ -177,31 +188,49 @@ public class TransformServiceXsl implements TransformService {
 		return false;
 	}
 	
-	private void transformItem(CmsItemId baseItemId, TransformConfig config, TransformerService transformerService, TransformOptions transformOptions, CmsPatchset patchset) {
+	private Set<CmsItemLock> transformItem(CmsItemId baseItemId, TransformConfig config, TransformerService transformerService, TransformOptions transformOptions, CmsPatchset patchset) {
 		
 		logger.debug("Transforming itemid: {}", baseItemId);
 		final CmsItemPropertiesMap props = getProperties(baseItemId, config);
 		final CmsItemPath outputPath = getOutputPath(baseItemId, config.getOptions().getParams().get("output"));
 		final boolean overwrite = Boolean.valueOf(config.getOptions().getParams().get("overwrite"));
+		final Set<CmsItemLock> locked = new HashSet<>();
 		
 		SaxonOutputURIResolverXdm outputURIResolver = new SaxonOutputURIResolverXdm(sourceReader);
 		transformOptions.setOutputURIResolver(outputURIResolver);
 		
-		TransformStreamProvider baseStreamProvider = transformerService.getTransformStreamProvider(baseItemId, transformOptions);
-		addToPatchset(patchset, outputPath.append(baseItemId.getRelPath().getName()), baseStreamProvider, overwrite, props);
-		
-		Set<String> resultDocsHrefs = outputURIResolver.getResultDocumentHrefs();
-		for (String href: resultDocsHrefs) {
-			if (href.startsWith("/")) {
-				throw new IllegalArgumentException("Relative href must not start with slash: " + href);
+		try {
+			
+			TransformStreamProvider baseStreamProvider = transformerService.getTransformStreamProvider(baseItemId, transformOptions);
+			locked.add(addToPatchset(patchset, outputPath.append(baseItemId.getRelPath().getName()), baseStreamProvider, overwrite, props));
+			
+			Set<String> resultDocsHrefs = outputURIResolver.getResultDocumentHrefs();
+			for (String href: resultDocsHrefs) {
+				if (href.startsWith("/")) {
+					throw new IllegalArgumentException("Relative href must not start with slash: " + href);
+				}
+				
+				XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(href);
+				TransformStreamProvider streamProvider = transformerOutput.getTransformStreamProvider(resultDocument, null);
+				
+				String decodedHref = decodeHref(href); // Items will be commited with decoded hrefs.
+				CmsItemPath path = outputPath.append(Arrays.asList(decodedHref.split("/")));
+				locked.add(addToPatchset(patchset, path, streamProvider, overwrite, props));
 			}
-			
-			XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(href);
-			TransformStreamProvider streamProvider = transformerOutput.getTransformStreamProvider(resultDocument, null);
-			
-			String decodedHref = decodeHref(href); // Items will be commited with decoded hrefs.
-			CmsItemPath path = outputPath.append(Arrays.asList(decodedHref.split("/")));
-			addToPatchset(patchset, path, streamProvider, overwrite, props);
+		} catch (RuntimeException e) {
+			// Unlock locks taken in this invocation of transformItem.
+			unlockItemsFailure(locked);
+			throw e;
+		}
+		return locked;
+	}
+	
+	private void unlockItemsFailure(Set<CmsItemLock> locked) {
+		logger.info("Transform failed, unlocking {} items.", locked.size());
+		try {
+			this.commit.unlock(locked.toArray(new CmsItemLock[0]));
+		} catch (Exception e) {
+			logger.warn("Failed to unlock items after transform / locking failed: {}", e.getMessage(), e);
 		}
 	}
 	
@@ -233,7 +262,8 @@ public class TransformServiceXsl implements TransformService {
 		return sb.toString();
 	}
 	
-	private void addToPatchset(CmsPatchset patchset, CmsItemPath relPath, TransformStreamProvider streamProvider, boolean overwrite, CmsItemPropertiesMap properties) {
+	private CmsItemLock addToPatchset(CmsPatchset patchset, CmsItemPath relPath, TransformStreamProvider streamProvider, boolean overwrite, CmsItemPropertiesMap properties) {
+		CmsItemLock lock = null;
 		try {
 			final InputStream transformStream = getInputStreamNotEmpty(streamProvider.get());
 			boolean pathExists = pathExists(patchset.getRepository(), relPath);
@@ -250,19 +280,20 @@ public class TransformServiceXsl implements TransformService {
 				if (locks != null && locks.getSingle() == null) {
 					throw new IllegalStateException("Unable to retrieve the lock token after locking " + itemId);
 				}
-				patchset.addLock(locks.getSingle());
+				lock = locks.getSingle();
+				patchset.addLock(lock);
 				FileModificationLocked fileMod = new FileModificationLocked(relPath, transformStream);
 				fileMod.setPropertyChange(properties);
 				patchset.add(fileMod);
 			} else {
 				throw new IllegalStateException("Item already exists, config prohibiting overwrite of existing items.");
 			}
-			
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to read stream from transform.", e);
 		} catch (EmptyStreamException e) {
 			logger.warn("Transform of item at path: '{}'  resulted in empty document, will be discarded.", relPath);
 		}
+		return lock;
 	}
 	
 	private CmsItemPath getOutputPath(CmsItemId itemId, String output) {
