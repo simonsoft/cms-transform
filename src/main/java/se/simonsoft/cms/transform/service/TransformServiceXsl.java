@@ -115,6 +115,11 @@ public class TransformServiceXsl implements TransformService {
 		final CmsRepository repository = baseItemId.getRepository();
 		final RepoRevision baseRevision = repoLookup.getYoungest(repository);
 		
+		// Prevent repository root, could be supported but requires some refactoring below.
+		if (baseItemId.getRelPath() == null) {
+			throw new IllegalArgumentException("TransformServiceXsl does not support repository root.");
+		}
+		
 		if (!config.getOptions().getType().equals("xsl")) {
 			throw new IllegalArgumentException("TransformServiceXsl can only handle xsl transforms but was given: " + config.getOptions().getType());
 		}
