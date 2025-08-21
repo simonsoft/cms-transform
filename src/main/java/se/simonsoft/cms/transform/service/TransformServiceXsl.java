@@ -18,7 +18,9 @@ package se.simonsoft.cms.transform.service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
-import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -55,6 +57,7 @@ import se.simonsoft.cms.item.properties.CmsItemPropertiesMap;
 import se.simonsoft.cms.item.structure.CmsItemClassificationXml;
 import se.simonsoft.cms.reporting.CmsItemLookupReporting;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
+import se.simonsoft.cms.transform.config.databind.TransformImportOptions;
 import se.simonsoft.cms.transform.lookup.CmsItemLookupTransform;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceDocumentS9api;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceReaderS9api;
@@ -81,7 +84,11 @@ public class TransformServiceXsl implements TransformService {
 	private static final String TRANSFORM_NAME_PROP_KEY = "abx:TransformName";
 	private static final int HISTORY_MSG_MAX_SIZE = 2000;
 	private static final String OUTPUT_TRANSFORM = "se/simonsoft/cms/transform/output.xsl";
-  
+
+	private static final int HTTP_URL_CONNECTION_READ_TIMEOUT = 60000;  	// 60 seconds
+	private static final int HTTP_URL_CONNECTION_CONNECT_TIMEOUT = 30000;  	// 30 seconds
+	private static final String HTTP_URL_CONNECTION_USER_AGENT = "cms-transform/1.0";
+
 	private static final Logger logger = LoggerFactory.getLogger(TransformServiceXsl.class);
 
 	@Inject
@@ -178,7 +185,71 @@ public class TransformServiceXsl implements TransformService {
 		RepoRevision r = commit.run(patchset);
 		logger.debug("Transform complete, commited with rev: {}", r.getNumber());
 	}
-	
+
+	public void importItem(CmsItemId item, TransformImportOptions config) {
+		if (config == null) {
+			throw new IllegalArgumentException("Import requires a valid TransformImportOptions object.");
+		}
+
+		String url = config.getUrl();
+		if (url == null || url.trim().isEmpty()) {
+			throw new IllegalArgumentException("Import requires a valid URL.");
+		}
+
+		final CmsRepository repository = item.getRepository();
+		final RepoRevision baseRevision = repoLookup.getYoungest(repository);
+		final CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
+		final boolean overwrite = Boolean.valueOf(config.getParams().get("overwrite"));
+		final CmsItemPropertiesMap properties = config.getItemPropertiesMap();
+
+		final Set<CmsItemLock> locked = new HashSet<>();
+
+		try {
+			InputStream downloadedStream = download(url);
+
+			CmsItemLock lock = addToPatchset(patchset, item.getRelPath(), downloadedStream, overwrite, properties);
+			if (lock != null) {
+				locked.add(lock);
+			}
+
+			String comment = config.getParams().get("comment");
+			if (comment != null && !comment.trim().isEmpty()) {
+				patchset.setHistoryMessage(comment);
+			}
+
+			RepoRevision r = commit.run(patchset);
+			logger.info("Import complete from URL: {}, committed with rev: {}", url, r.getNumber());
+
+		} catch (IOException | URISyntaxException e) {
+			logger.error("Failed to download content from URL: {}", url, e);
+			unlockItemsFailure(locked);
+			throw new RuntimeException("Failed to download content from URL: " + url, e);
+		} catch (RuntimeException e) {
+			logger.warn("Failed to import item: {}", e.getMessage(), e);
+			unlockItemsFailure(locked);
+			throw e;
+		}
+	}
+
+	private InputStream download(String url) throws IOException, URISyntaxException {
+		URI uri = new URI(url);
+		HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
+		connection.setRequestMethod("GET");
+		connection.setConnectTimeout(HTTP_URL_CONNECTION_CONNECT_TIMEOUT);
+		connection.setReadTimeout(HTTP_URL_CONNECTION_READ_TIMEOUT);
+		connection.setInstanceFollowRedirects(true);
+
+		// Set user agent to avoid blocking by some servers
+		connection.setRequestProperty("User-Agent", HTTP_URL_CONNECTION_USER_AGENT);
+
+		int responseCode = connection.getResponseCode();
+		if (responseCode == HttpURLConnection.HTTP_OK) {
+			return connection.getInputStream();
+		} else {
+			throw new IOException("HTTP request failed with response code: " + responseCode + " for URL: " + url);
+		}
+	}
+
 	private boolean isTransformable(CmsItemId itemId) {
 		
 		CmsItemClassificationXml classification = new CmsItemClassificationXml();
@@ -187,11 +258,8 @@ public class TransformServiceXsl implements TransformService {
 		}
 		CmsItem item = this.itemLookup.getItem(itemId);
 		// TODO: Use cms-item method when available.
-		if (isCmsClass(item.getProperties(), "tikahtml")) {
-			return true;
-		}
-		return false;
-	}
+        return isCmsClass(item.getProperties(), "tikahtml");
+    }
 	
 	private Set<CmsItemLock> transformItem(CmsItemId baseItemId, TransformConfig config, TransformerService transformerService, TransformOptions transformOptions, CmsPatchset patchset) {
 		
@@ -267,6 +335,40 @@ public class TransformServiceXsl implements TransformService {
 		return sb.toString();
 	}
 	
+	private CmsItemLock addToPatchset(CmsPatchset patchset, CmsItemPath relPath, InputStream inputStream, boolean overwrite, CmsItemPropertiesMap properties) {
+		CmsItemLock lock = null;
+		try {
+			final InputStream contentStream = getInputStreamNotEmpty(inputStream);
+			boolean pathExists = pathExists(patchset.getRepository(), relPath);
+			if (!pathExists) {
+				addFolderExists(patchset, relPath.getParent());
+				logger.debug("No file at path: '{}' will add new file.", relPath);
+				FileAdd fileAdd = new FileAdd(relPath, contentStream);
+				fileAdd.setPropertyChange(properties);
+				patchset.add(fileAdd);
+			} else if (overwrite){
+				logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", relPath.getPath());
+				CmsItemId itemId = patchset.getRepository().getItemId().withRelPath(relPath);
+				CmsItemLockCollection locks = commit.lock(TRANSFORM_LOCK_COMMENT, patchset.getBaseRevision(), itemId.getRelPath());
+				if (locks != null && locks.getSingle() == null) {
+					throw new IllegalStateException("Unable to retrieve the lock token after locking " + itemId);
+				}
+				lock = locks.getSingle();
+				patchset.addLock(lock);
+				FileModificationLocked fileMod = new FileModificationLocked(relPath, contentStream);
+				fileMod.setPropertyChange(properties);
+				patchset.add(fileMod);
+			} else {
+				throw new IllegalStateException("Item already exists, config prohibiting overwrite of existing items.");
+			}
+		} catch (IOException e) {
+			throw new RuntimeException("Failed to read stream from import.", e);
+		} catch (EmptyStreamException e) {
+			logger.warn("Import of item at path: '{}'  resulted in empty document, will be discarded.", relPath);
+		}
+		return lock;
+	}
+
 	private CmsItemLock addToPatchset(CmsPatchset patchset, CmsItemPath relPath, TransformStreamProvider streamProvider, boolean overwrite, CmsItemPropertiesMap properties) {
 		CmsItemLock lock = null;
 		try {
@@ -374,7 +476,7 @@ public class TransformServiceXsl implements TransformService {
 	}
 
 	private boolean emptyExceptDeclaration(String data) {
-		return data.substring(data.indexOf("?>") + 2, data.length()).trim().isEmpty();
+		return data.substring(data.indexOf("?>") + 2).trim().isEmpty();
 	}
 	
 	private CmsItemPropertiesMap getProperties(CmsItemId baseId, TransformConfig config) {
@@ -409,13 +511,8 @@ public class TransformServiceXsl implements TransformService {
 	}
 	
 	private String decodeHref(String href) {
-		try {
-			href = java.net.URLDecoder.decode(href, "UTF-8");
-		} catch (UnsupportedEncodingException e) {
-			logger.error("Could not decode URL", e);
-			throw new IllegalArgumentException("Could not decode URL: " + href);
-		}
-		return href;
+        href = java.net.URLDecoder.decode(href, StandardCharsets.UTF_8);
+        return href;
 	}
 	
 	private static boolean isCmsClass(CmsItemProperties properties, String cmsClass) {
@@ -442,5 +539,4 @@ public class TransformServiceXsl implements TransformService {
 		}
 		
 	}
-
 }
