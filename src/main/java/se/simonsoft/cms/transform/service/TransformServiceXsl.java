@@ -186,6 +186,7 @@ public class TransformServiceXsl implements TransformService {
 		logger.debug("Transform complete, commited with rev: {}", r.getNumber());
 	}
 
+	@Override
 	public void importItem(CmsItemId item, TransformImportOptions config) {
 		if (config == null) {
 			throw new IllegalArgumentException("Import requires a valid TransformImportOptions object.");
