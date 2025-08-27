@@ -52,6 +52,7 @@ public class TransformImportOptions {
 	private String url; // Typically an http / https url, no authentication required. Redirects must be followed.
 	private String content; // Content to import, typically XML or JSON.
 	private Map <String, String> properties = new HashMap<>(); // Properties to set on the item.
+	private Map <String, String> revprops = new HashMap<>(); // TODO: Consider supporting revision properties (backend recently supports).
 	
 	
 	public Map<String, String> getParams() {
