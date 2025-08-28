@@ -24,6 +24,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,11 +51,23 @@ public class TransformResource {
     @Path("api/import")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response importItem(@QueryParam("itemId") String itemIdParam, TransformImportOptions importOptions) {
+    public Response importItem(@QueryParam("itemId") String itemIdParam, String body) {
 
         if (itemIdParam == null || itemIdParam.trim().isEmpty()) {
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity("{\"error\": \"itemId query parameter is required\"}")
+                    .build();
+        }
+
+        TransformImportOptions importOptions;
+
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            importOptions = mapper.readValue(body, TransformImportOptions.class);
+        } catch (Exception e) {
+            logger.warn("Failed to parse JSON request body", e);
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("{\"error\": \"Invalid JSON in request body: " + e.getMessage() + "\"}")
                     .build();
         }
 
