@@ -20,18 +20,21 @@ import javax.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.simonsoft.cms.item.CmsItemId;
+import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.command.ExternalCommandHandler;
 import se.simonsoft.cms.transform.config.databind.TransformImportOptions;
 import se.simonsoft.cms.transform.service.TransformService;
 
+import java.util.Map;
+
 public class TransformImportCommandHandler implements ExternalCommandHandler<TransformImportOptions> {
 
     private final Logger logger = LoggerFactory.getLogger(TransformImportCommandHandler.class);
-    private final TransformService transformService;
+    private final Map<CmsRepository, TransformService> transformServiceMap;
 
     @Inject
-    public TransformImportCommandHandler(TransformService transformService) {
-        this.transformService = transformService;
+    public TransformImportCommandHandler(Map<CmsRepository, TransformService> transformServiceMap) {
+        this.transformServiceMap = transformServiceMap;
     }
 
     @Override
@@ -40,7 +43,7 @@ public class TransformImportCommandHandler implements ExternalCommandHandler<Tra
         logger.info("Starting import for item: {} from URL: {}", item.getLogicalId(), arguments.getUrl());
         
         try {
-            transformService.importItem(item, arguments);
+            transformServiceMap.get(item.getRepository()).importItem(item, arguments);
             String successMessage = "Import completed successfully for item: " + item.getLogicalId();
             logger.info(successMessage);
             return successMessage;

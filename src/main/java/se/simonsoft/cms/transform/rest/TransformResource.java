@@ -28,23 +28,26 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import se.simonsoft.cms.item.CmsItemId;
+import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.transform.service.TransformService;
 import se.simonsoft.cms.transform.config.databind.TransformImportOptions;
+
+import java.util.Map;
 
 @Path("/transform5")
 public class TransformResource {
 
     private final Logger logger = LoggerFactory.getLogger(TransformResource.class);
-    private final TransformService transformService;
+    private final Map<CmsRepository, TransformService> transformServiceMap;
 
     @Inject
-    public TransformResource(TransformService transformService) {
-        this.transformService = transformService;
+    public TransformResource(Map<CmsRepository, TransformService> transformServiceMap) {
+        this.transformServiceMap = transformServiceMap;
     }
 
     @POST
-    @Path("/api/import")
+    @Path("api/import")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response importItem(@QueryParam("itemId") String itemIdParam, TransformImportOptions importOptions) {
@@ -63,8 +66,8 @@ public class TransformResource {
 
         try {
             CmsItemId itemId = new CmsItemIdArg(itemIdParam);
-            transformService.importItem(itemId, importOptions);
-            
+            transformServiceMap.get(itemId.getRepository()).importItem(itemId, importOptions);
+
             String successMessage = "Import completed successfully for item: " + itemId.getLogicalId();
             return Response.ok()
                     .entity("{\"message\": \"" + successMessage + "\"}")
