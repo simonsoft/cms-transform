@@ -19,8 +19,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
 import java.net.HttpURLConnection;
-import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -35,6 +35,7 @@ import javax.xml.transform.stream.StreamSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.slf4j.helpers.MessageFormatter;
 import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
 import se.simonsoft.cms.item.CmsItemKind;
@@ -52,6 +53,9 @@ import se.simonsoft.cms.item.commit.FolderExist;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsItemNotFoundException;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
+import se.simonsoft.cms.item.naming.CmsItemNamePattern;
+import se.simonsoft.cms.item.naming.CmsItemNaming;
+import se.simonsoft.cms.item.naming.CmsItemNamingShard1K;
 import se.simonsoft.cms.item.properties.CmsItemProperties;
 import se.simonsoft.cms.item.properties.CmsItemPropertiesMap;
 import se.simonsoft.cms.item.structure.CmsItemClassificationXml;
@@ -88,6 +92,9 @@ public class TransformServiceXsl implements TransformService {
 	private static final int HTTP_URL_CONNECTION_READ_TIMEOUT = 60000;  	// 60 seconds
 	private static final int HTTP_URL_CONNECTION_CONNECT_TIMEOUT = 30000;  	// 30 seconds
 	private static final String HTTP_URL_CONNECTION_USER_AGENT = "cms-transform/1.0";
+
+	private static final String CMS_CLASS_SHARDPARENT = "shardparent";
+	private static final String PROPNAME_CONFIG_ITEMNAMEPATTERN = "cmsconfig:ItemNamePattern";
 
 	private static final Logger logger = LoggerFactory.getLogger(TransformServiceXsl.class);
 
@@ -206,9 +213,8 @@ public class TransformServiceXsl implements TransformService {
 		final Set<CmsItemLock> locked = new HashSet<>();
 
 		try {
-			InputStream downloadedStream = download(url);
-
-			CmsItemLock lock = addToPatchset(patchset, item.getRelPath(), downloadedStream, overwrite, properties);
+			DownloadResult downloadResult = download(url);
+			CmsItemLock lock = addToPatchset(patchset, item, downloadResult, overwrite, properties);
 			if (lock != null) {
 				locked.add(lock);
 			}
@@ -232,9 +238,8 @@ public class TransformServiceXsl implements TransformService {
 		}
 	}
 
-	private InputStream download(String url) throws IOException, URISyntaxException {
-		URI uri = new URI(url);
-		HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
+	private DownloadResult download(String url) throws IOException, URISyntaxException {
+		HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
 		connection.setRequestMethod("GET");
 		connection.setConnectTimeout(HTTP_URL_CONNECTION_CONNECT_TIMEOUT);
 		connection.setReadTimeout(HTTP_URL_CONNECTION_READ_TIMEOUT);
@@ -245,9 +250,65 @@ public class TransformServiceXsl implements TransformService {
 
 		int responseCode = connection.getResponseCode();
 		if (responseCode == HttpURLConnection.HTTP_OK) {
-			return connection.getInputStream();
+			String contentType = connection.getContentType();
+			String extension = getExtensionFromContentType(contentType);
+			return new DownloadResult(connection.getInputStream(), contentType, extension);
 		} else {
 			throw new IOException("HTTP request failed with response code: " + responseCode + " for URL: " + url);
+		}
+	}
+
+	private String getExtensionFromContentType(String contentType) {
+		if (contentType == null) return null;
+		String mimeType = contentType.toLowerCase().split(";")[0].trim();
+		switch (mimeType) {
+			// Images
+			case "image/jpeg": return "jpg";
+			case "image/png": return "png";
+			case "image/gif": return "gif";
+			case "image/svg+xml": return "svg";
+			case "image/webp": return "webp";
+			case "image/bmp": return "bmp";
+			case "image/tiff": return "tiff";
+			case "image/x-icon": return "ico";
+
+			// Text/Markup
+			case "text/xml":
+			case "application/xml": return "xml";
+			case "application/json": return "json";
+			case "text/plain": return "txt";
+			case "text/html": return "html";
+			case "text/css": return "css";
+			case "text/csv": return "csv";
+
+			// Documents
+			case "application/pdf": return "pdf";
+			case "application/msword": return "doc";
+			case "application/vnd.openxmlformats-officedocument.wordprocessingml.document": return "docx";
+			case "application/vnd.ms-excel": return "xls";
+			case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": return "xlsx";
+			case "application/vnd.ms-powerpoint": return "ppt";
+			case "application/vnd.openxmlformats-officedocument.presentationml.presentation": return "pptx";
+			case "application/rtf": return "rtf";
+
+			// Archives
+			case "application/zip": return "zip";
+			case "application/x-rar-compressed": return "rar";
+			case "application/x-tar": return "tar";
+			case "application/gzip": return "gz";
+
+			// Code/Scripts
+			case "application/javascript":
+			case "text/javascript": return "js";
+
+			// Audio/Video
+			case "audio/mpeg": return "mp3";
+			case "audio/wav": return "wav";
+			case "video/mp4": return "mp4";
+			case "video/mpeg": return "mpeg";
+			case "video/quicktime": return "mov";
+
+			default: return null;
 		}
 	}
 
@@ -336,20 +397,82 @@ public class TransformServiceXsl implements TransformService {
 		return sb.toString();
 	}
 	
-	private CmsItemLock addToPatchset(CmsPatchset patchset, CmsItemPath relPath, InputStream inputStream, boolean overwrite, CmsItemPropertiesMap properties) {
+	private CmsItemLock addToPatchset(CmsPatchset patchset, CmsItemId itemId, DownloadResult downloadResult, boolean overwrite, CmsItemPropertiesMap properties) {
+		boolean pathExists;
+		boolean isFolder = false;
 		CmsItemLock lock = null;
+		CmsItemPath relPath = itemId.getRelPath();
+		CmsRepository repository = itemId.getRepository();
+		InputStream inputStream = downloadResult.getInputStream();
+		CmsItemNaming itemNaming = new CmsItemNamingShard1K(repository, itemLookup);
+		// Determine whether the given path exists and if it is a folder
+		try {
+			CmsItem item = itemLookup.getItem(itemId);
+			isFolder = item.getKind().isFolder();
+			pathExists = true;
+		} catch (CmsItemNotFoundException e) {
+			pathExists = false;
+		}
 		try {
 			final InputStream contentStream = getInputStreamNotEmpty(inputStream);
-			boolean pathExists = pathExists(patchset.getRepository(), relPath);
 			if (!pathExists) {
-				addFolderExists(patchset, relPath.getParent());
-				logger.debug("No file at path: '{}' will add new file.", relPath);
-				FileAdd fileAdd = new FileAdd(relPath, contentStream);
+				CmsItemPath itemPath = relPath;
+				// The path doesn't exist, it could still be either a file or a folder
+				isFolder = relPath.getName().endsWith("/") || !relPath.getName().contains(".");
+				if (isFolder) {
+					// It's a folder
+					addFolderExists(patchset, relPath);
+					// Auto-name the file
+					CmsItem location = itemLookup.getItem(repository.getItemId(relPath, null));
+					CmsItemProperties locationProps = location.getProperties();
+					if (!isCmsClass(locationProps, CMS_CLASS_SHARDPARENT)) {
+						String msg = MessageFormatter.format("Location is not a shardparent: {}", relPath).getMessage();
+						logger.error(msg);
+						throw new IllegalArgumentException(msg);
+					}
+					// The cmsconfig name pattern overrides the bursting rule.
+					if (!locationProps.containsProperty(PROPNAME_CONFIG_ITEMNAMEPATTERN)) {
+						String msg = MessageFormatter.format("Location does not define a name pattern: {}", relPath).getMessage();
+						logger.error(msg);
+						throw new IllegalArgumentException(msg);
+					}
+					CmsItemNamePattern namePattern = new CmsItemNamePattern(locationProps.getString(PROPNAME_CONFIG_ITEMNAMEPATTERN));
+					itemPath = itemNaming.getItemPath(relPath, namePattern, downloadResult.getExtension());
+				} else {
+					// It's a file
+					addFolderExists(patchset, relPath.getParent());
+				}
+				logger.debug("No file at path: '{}' will add new file.", itemPath);
+				FileAdd fileAdd = new FileAdd(itemPath, contentStream);
 				fileAdd.setPropertyChange(properties);
 				patchset.add(fileAdd);
-			} else if (overwrite){
+			} else if (isFolder) {
+				// The path exists and is a folder
+				addFolderExists(patchset, relPath);
+				// Auto-name the file
+				CmsItem location = itemLookup.getItem(repository.getItemId(relPath, null));
+				CmsItemProperties locationProps = location.getProperties();
+				if (!isCmsClass(locationProps, CMS_CLASS_SHARDPARENT)) {
+					String msg = MessageFormatter.format("Location is not a shardparent: {}", relPath).getMessage();
+					logger.error(msg);
+					throw new IllegalArgumentException(msg);
+				}
+				// The cmsconfig name pattern overrides the bursting rule.
+				if (!locationProps.containsProperty(PROPNAME_CONFIG_ITEMNAMEPATTERN)) {
+					String msg = MessageFormatter.format("Location does not define a name pattern: {}", relPath).getMessage();
+					logger.error(msg);
+					throw new IllegalArgumentException(msg);
+				}
+				CmsItemNamePattern namePattern = new CmsItemNamePattern(locationProps.getString(PROPNAME_CONFIG_ITEMNAMEPATTERN));
+				CmsItemPath itemPath = itemNaming.getItemPath(relPath, namePattern, "jpg");
+				logger.debug("No file at path: '{}' will add new file.", itemPath);
+				addFolderExists(patchset, itemPath.getParent());
+				FileAdd fileAdd = new FileAdd(itemPath, contentStream);
+				fileAdd.setPropertyChange(properties);
+				patchset.add(fileAdd);
+			} else if (overwrite) {
+				// The file exists and is, and we are allowed to overwrite
 				logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", relPath.getPath());
-				CmsItemId itemId = patchset.getRepository().getItemId().withRelPath(relPath);
 				CmsItemLockCollection locks = commit.lock(TRANSFORM_LOCK_COMMENT, patchset.getBaseRevision(), itemId.getRelPath());
 				if (locks != null && locks.getSingle() == null) {
 					throw new IllegalStateException("Unable to retrieve the lock token after locking " + itemId);
@@ -360,6 +483,7 @@ public class TransformServiceXsl implements TransformService {
 				fileMod.setPropertyChange(properties);
 				patchset.add(fileMod);
 			} else {
+				// The file exists, and we are not allowed to overwrite it
 				throw new IllegalStateException("Item already exists, config prohibiting overwrite of existing items.");
 			}
 		} catch (IOException e) {
@@ -539,5 +663,21 @@ public class TransformServiceXsl implements TransformService {
 			super(message);
 		}
 		
+	}
+
+	private class DownloadResult {
+		private final InputStream inputStream;
+		private final String contentType;
+		private final String extension;
+
+		public DownloadResult(InputStream inputStream, String contentType, String extension) {
+			this.inputStream = inputStream;
+			this.contentType = contentType;
+			this.extension = extension;
+		}
+
+		public InputStream getInputStream() { return inputStream; }
+		public String getContentType() { return contentType; }
+		public String getExtension() { return extension; }
 	}
 }
