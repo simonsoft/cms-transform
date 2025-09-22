@@ -18,10 +18,13 @@ package se.simonsoft.cms.transform.service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
-import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -227,7 +230,7 @@ public class TransformServiceXsl implements TransformService {
 			RepoRevision r = commit.run(patchset);
 			logger.info("Import complete from URL: {}, committed with rev: {}", url, r.getNumber());
 
-		} catch (IOException | URISyntaxException e) {
+		} catch (IOException | URISyntaxException | InterruptedException e) {
 			logger.error("Failed to download content from URL: {}", url, e);
 			unlockItemsFailure(locked);
 			throw new RuntimeException("Failed to download content from URL: " + url, e);
@@ -238,23 +241,27 @@ public class TransformServiceXsl implements TransformService {
 		}
 	}
 
-	private DownloadResult download(String url) throws IOException, URISyntaxException {
-		HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-		connection.setRequestMethod("GET");
-		connection.setConnectTimeout(HTTP_URL_CONNECTION_CONNECT_TIMEOUT);
-		connection.setReadTimeout(HTTP_URL_CONNECTION_READ_TIMEOUT);
-		connection.setInstanceFollowRedirects(true);
+	private DownloadResult download(String url) throws IOException, URISyntaxException, InterruptedException {
+		HttpClient client = HttpClient.newBuilder()
+				.connectTimeout(Duration.ofMillis(HTTP_URL_CONNECTION_CONNECT_TIMEOUT))
+				.followRedirects(HttpClient.Redirect.NORMAL)
+				.build();
 
-		// Set user agent to avoid blocking by some servers
-		connection.setRequestProperty("User-Agent", HTTP_URL_CONNECTION_USER_AGENT);
+		HttpRequest request = HttpRequest.newBuilder()
+				.uri(URI.create(url))
+				.timeout(Duration.ofMillis(HTTP_URL_CONNECTION_READ_TIMEOUT))
+				.header("User-Agent", HTTP_URL_CONNECTION_USER_AGENT)
+				.GET()
+				.build();
 
-		int responseCode = connection.getResponseCode();
-		if (responseCode == HttpURLConnection.HTTP_OK) {
-			String contentType = connection.getContentType();
+		HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+
+		if (response.statusCode() == 200) {
+			String contentType = response.headers().firstValue("Content-Type").orElse(null);
 			String extension = getExtensionFromContentType(contentType);
-			return new DownloadResult(connection.getInputStream(), contentType, extension);
+			return new DownloadResult(response.body(), contentType, extension);
 		} else {
-			throw new IOException("HTTP request failed with response code: " + responseCode + " for URL: " + url);
+			throw new IOException("HTTP request failed with response code: " + response.statusCode() + " for URL: " + url);
 		}
 	}
 
@@ -416,34 +423,9 @@ public class TransformServiceXsl implements TransformService {
 		try {
 			final InputStream contentStream = getInputStreamNotEmpty(inputStream);
 			if (!pathExists) {
-				CmsItemPath itemPath = relPath;
-				// The path doesn't exist, it could still be either a file or a folder
-				isFolder = relPath.getName().endsWith("/") || !relPath.getName().contains(".");
-				if (isFolder) {
-					// It's a folder
-					addFolderExists(patchset, relPath);
-					// Auto-name the file
-					CmsItem location = itemLookup.getItem(repository.getItemId(relPath, null));
-					CmsItemProperties locationProps = location.getProperties();
-					if (!isCmsClass(locationProps, CMS_CLASS_SHARDPARENT)) {
-						String msg = MessageFormatter.format("Location is not a shardparent: {}", relPath).getMessage();
-						logger.error(msg);
-						throw new IllegalArgumentException(msg);
-					}
-					// The cmsconfig name pattern overrides the bursting rule.
-					if (!locationProps.containsProperty(PROPNAME_CONFIG_ITEMNAMEPATTERN)) {
-						String msg = MessageFormatter.format("Location does not define a name pattern: {}", relPath).getMessage();
-						logger.error(msg);
-						throw new IllegalArgumentException(msg);
-					}
-					CmsItemNamePattern namePattern = new CmsItemNamePattern(locationProps.getString(PROPNAME_CONFIG_ITEMNAMEPATTERN));
-					itemPath = itemNaming.getItemPath(relPath, namePattern, downloadResult.getExtension());
-				} else {
-					// It's a file
-					addFolderExists(patchset, relPath.getParent());
-				}
-				logger.debug("No file at path: '{}' will add new file.", itemPath);
-				FileAdd fileAdd = new FileAdd(itemPath, contentStream);
+				addFolderExists(patchset, relPath.getParent());
+				logger.debug("No file at path: '{}' will add new file.", relPath);
+				FileAdd fileAdd = new FileAdd(relPath, contentStream);
 				fileAdd.setPropertyChange(properties);
 				patchset.add(fileAdd);
 			} else if (isFolder) {

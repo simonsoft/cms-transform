@@ -24,6 +24,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,12 +52,10 @@ public class TransformResource {
     @Path("api/import")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response importItem(@QueryParam("itemId") String itemIdParam, String body) {
+    public Response importItem(@QueryParam("item") CmsItemIdArg itemId, String body) {
 
-        if (itemIdParam == null || itemIdParam.trim().isEmpty()) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity("{\"error\": \"itemId query parameter is required\"}")
-                    .build();
+        if (itemId == null) {
+            throw new IllegalArgumentException("Field 'item': required");
         }
 
         TransformImportOptions importOptions;
@@ -64,11 +63,9 @@ public class TransformResource {
         try {
             ObjectMapper mapper = new ObjectMapper();
             importOptions = mapper.readValue(body, TransformImportOptions.class);
-        } catch (Exception e) {
-            logger.warn("Failed to parse JSON request body", e);
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity("{\"error\": \"Invalid JSON in request body: " + e.getMessage() + "\"}")
-                    .build();
+        } catch (JsonProcessingException e) {
+            logger.error("API request with invalid JSON body: {}", body, e);
+            throw new IllegalArgumentException("Failed to parse request body: " + e.getMessage(), e);
         }
 
         if (importOptions == null) {
@@ -78,7 +75,6 @@ public class TransformResource {
         }
 
         try {
-            CmsItemId itemId = new CmsItemIdArg(itemIdParam);
             transformServiceMap.get(itemId.getRepository()).importItem(itemId, importOptions);
 
             String successMessage = "Import completed successfully for item: " + itemId.getLogicalId();
@@ -87,13 +83,10 @@ public class TransformResource {
                     .build();
                     
         } catch (IllegalArgumentException e) {
-            logger.warn("Invalid itemId parameter: {}", itemIdParam, e);
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity("{\"error\": \"Invalid itemId parameter: " + e.getMessage() + "\"}")
-                    .build();
-                    
+            logger.warn("Invalid itemId parameter: {}", itemId.getLogicalId(), e);
+            throw e;
         } catch (Exception e) {
-            logger.error("Import failed for itemId: {}", itemIdParam, e);
+            logger.error("Import failed for itemId: {}", itemId.getLogicalId(), e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                     .entity("{\"error\": \"Import failed: " + e.getMessage() + "\"}")
                     .build();
