@@ -83,10 +83,10 @@ public class TransformResource {
                     .build();
                     
         } catch (IllegalArgumentException e) {
-            logger.warn("Invalid itemId parameter: {}", itemId.getLogicalId(), e);
+            logger.warn("Invalid itemId parameter: {}", itemId, e);
             throw e;
         } catch (Exception e) {
-            logger.error("Import failed for itemId: {}", itemId.getLogicalId(), e);
+            logger.error("Import failed for itemId: {}", itemId, e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                     .entity("{\"error\": \"Import failed: " + e.getMessage() + "\"}")
                     .build();

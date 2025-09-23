@@ -250,7 +250,8 @@ public class TransformServiceXsl implements TransformService {
 		HttpRequest request = HttpRequest.newBuilder()
 				.uri(URI.create(url))
 				.timeout(Duration.ofMillis(HTTP_URL_CONNECTION_READ_TIMEOUT))
-				.header("User-Agent", HTTP_URL_CONNECTION_USER_AGENT)
+		// Use the default User-Agent for now. Consider injecting a good universal value in CMS 6.0.
+		//		.header("User-Agent", HTTP_URL_CONNECTION_USER_AGENT)
 				.GET()
 				.build();
 
