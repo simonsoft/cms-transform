@@ -17,8 +17,11 @@ package se.simonsoft.cms.transform.service;
 
 import se.simonsoft.cms.item.CmsItemId;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
+import se.simonsoft.cms.transform.config.databind.TransformImportOptions;
 
 public interface TransformService {
 	
 	void transform(CmsItemId item, TransformConfig config);
+
+	void importItem(CmsItemId item, TransformImportOptions config);
 }
