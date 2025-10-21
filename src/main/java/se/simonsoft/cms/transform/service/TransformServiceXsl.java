@@ -39,6 +39,7 @@ import javax.xml.transform.stream.StreamSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.slf4j.helpers.MessageFormatter;
 import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
 import se.simonsoft.cms.item.CmsItemKind;
@@ -205,6 +206,7 @@ public class TransformServiceXsl implements TransformService {
 		}
 
 		CmsItemPath relPath = item.getRelPath();
+		CmsItemPath parentFolder = relPath.getParent();
 
 		final String url = config.getUrl();
 		final String content = config.getContent();
@@ -234,18 +236,18 @@ public class TransformServiceXsl implements TransformService {
 		final String pathnamebase = config.getParams().get("pathnamebase");
 		final CmsItem location = itemLookup.getItem(repository.getItemId(relPath, null));
 		final CmsItemProperties locationProps = location.getProperties();
+
 		final boolean isShardParent = isCmsClass(locationProps, CMS_CLASS_SHARDPARENT);
 		final boolean hasNamePattern = locationProps.containsProperty(PROPNAME_CONFIG_ITEMNAMEPATTERN);
+		final boolean hasPathnamebase = pathnamebase != null && !pathnamebase.isEmpty();
 
-		if (isShardParent && hasNamePattern && pathnamebase != null && !pathnamebase.isEmpty()) {
-			throw new IllegalStateException("The pathnamebase is not allowed when the folder is configured a shardparent with a name pattern.");
-		}
-
-		if (isShardParent && hasNamePattern) {
+		if (isShardParent) {
+			if (!hasNamePattern) throw new IllegalArgumentException(MessageFormatter.format("Location does not define a name pattern: {}", parentFolder).getMessage());
+			if (hasPathnamebase) throw new IllegalStateException("The pathnamebase is not allowed when the folder is configured a shardparent with a name pattern.");
 			CmsItemNaming itemNaming = new CmsItemNamingShard1K(repository, itemLookup);
 			CmsItemNamePattern namePattern = new CmsItemNamePattern(locationProps.getString(PROPNAME_CONFIG_ITEMNAMEPATTERN));
 			relPath = itemNaming.getItemPath(relPath, namePattern, pathext);
-		} else if (pathnamebase != null && !pathnamebase.isEmpty()) {
+		} else if (hasPathnamebase) {
 			relPath = relPath.append(String.format("%s.%s", pathnamebase, pathext));
 		} else {
 			throw new IllegalStateException("Either the folder must be configured a shardparent with a name pattern or a pathnamebase parameter must be supplied.");
