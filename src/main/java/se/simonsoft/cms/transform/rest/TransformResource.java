@@ -16,6 +16,7 @@
 package se.simonsoft.cms.transform.rest;
 
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -46,11 +47,16 @@ public class TransformResource {
     private final Logger logger = LoggerFactory.getLogger(TransformResource.class);
     private final Map<CmsRepository, TransformService> transformServiceMap;
     private final ObjectWriter objectWriter;
+    private String hostname;
 
     private static final int MAX_CONTENT_SIZE_MB = 5;
 
     @Inject
-    public TransformResource(Map<CmsRepository, TransformService> transformServiceMap, ObjectWriter objectWriter) {
+    public TransformResource(
+            @Named("config:se.simonsoft.cms.hostname") String hostname,
+            Map<CmsRepository, TransformService> transformServiceMap,
+            ObjectWriter objectWriter) {
+        this.hostname = hostname;
         this.transformServiceMap = transformServiceMap;
         this.objectWriter = objectWriter;
     }
@@ -59,11 +65,13 @@ public class TransformResource {
     @Path("api/import")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response importItem(@QueryParam("item") CmsItemIdArg itemId, String body) throws JsonProcessingException {
+    public Response importItem(@QueryParam("item") CmsItemIdArg item, String body) throws JsonProcessingException {
 
-        if (itemId == null) {
+        if (item == null) {
             throw new IllegalArgumentException("Field 'item': required");
         }
+
+        item.setHostnameOrValidate(hostname);
 
         TransformImportOptions importOptions;
 
@@ -92,14 +100,14 @@ public class TransformResource {
 
         try {
             Map<String, Set<CmsItemId>> response = new HashMap<>();
-            Set<CmsItemId> items = transformServiceMap.get(itemId.getRepository()).importItem(itemId, importOptions);
+            Set<CmsItemId> items = transformServiceMap.get(item.getRepository()).importItem(item, importOptions);
             response.put("items", items);
             return Response.ok().entity(objectWriter.writeValueAsString(response)).build();
         } catch (IllegalArgumentException e) {
-            logger.warn("Invalid input parameters for itemId: {}, importOptions: {}", itemId, body, e);
+            logger.warn("Invalid input parameters for item: {}, importOptions: {}", item, body, e);
             throw e;
         } catch (Exception e) {
-            logger.error("Import failed for itemId: {}, error: {}", itemId, e.getMessage());
+            logger.error("Import failed for item: {}, error: {}", item, e.getMessage());
             throw e;
         }
     }
