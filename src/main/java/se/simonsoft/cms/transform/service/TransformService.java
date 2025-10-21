@@ -19,9 +19,11 @@ import se.simonsoft.cms.item.CmsItemId;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.transform.config.databind.TransformImportOptions;
 
+import java.util.Set;
+
 public interface TransformService {
 	
 	void transform(CmsItemId item, TransformConfig config);
 
-	void importItem(CmsItemId item, TransformImportOptions config);
+	Set<CmsItemId> importItem(CmsItemId item, TransformImportOptions config);
 }

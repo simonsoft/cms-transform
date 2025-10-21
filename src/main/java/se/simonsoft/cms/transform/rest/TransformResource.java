@@ -26,6 +26,7 @@ import javax.ws.rs.core.Response;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,24 +36,30 @@ import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.transform.service.TransformService;
 import se.simonsoft.cms.transform.config.databind.TransformImportOptions;
 
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 @Path("/transform5")
 public class TransformResource {
 
     private final Logger logger = LoggerFactory.getLogger(TransformResource.class);
     private final Map<CmsRepository, TransformService> transformServiceMap;
+    private final ObjectWriter objectWriter;
+
+    private static final int MAX_CONTENT_SIZE_MB = 5;
 
     @Inject
-    public TransformResource(Map<CmsRepository, TransformService> transformServiceMap) {
+    public TransformResource(Map<CmsRepository, TransformService> transformServiceMap, ObjectWriter objectWriter) {
         this.transformServiceMap = transformServiceMap;
+        this.objectWriter = objectWriter;
     }
 
     @POST
     @Path("api/import")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response importItem(@QueryParam("item") CmsItemIdArg itemId, String body) {
+    public Response importItem(@QueryParam("item") CmsItemIdArg itemId, String body) throws JsonProcessingException {
 
         if (itemId == null) {
             throw new IllegalArgumentException("Field 'item': required");
@@ -74,22 +81,26 @@ public class TransformResource {
                     .build();
         }
 
-        try {
-            transformServiceMap.get(itemId.getRepository()).importItem(itemId, importOptions);
+        String url = importOptions.getUrl();
+        String content = importOptions.getContent();
 
-            String successMessage = "Import completed successfully for item: " + itemId.getLogicalId();
-            return Response.ok()
-                    .entity("{\"message\": \"" + successMessage + "\"}")
-                    .build();
-                    
+        if ((content != null && url != null) || (content == null && url == null)) {
+            throw new IllegalArgumentException("Import requires either a valid URL or content.");
+        } else if (content != null && content.length() > MAX_CONTENT_SIZE_MB * 1024 * 1024) {
+            throw new IllegalArgumentException(String.format("Largest allowed content size is %d MBs.", MAX_CONTENT_SIZE_MB));
+        }
+
+        try {
+            Map<String, Set<CmsItemId>> response = new HashMap<>();
+            Set<CmsItemId> items = transformServiceMap.get(itemId.getRepository()).importItem(itemId, importOptions);
+            response.put("items", items);
+            return Response.ok().entity(objectWriter.writeValueAsString(response)).build();
         } catch (IllegalArgumentException e) {
-            logger.warn("Invalid itemId parameter: {}", itemId, e);
+            logger.warn("Invalid input parameters for itemId: {}, importOptions: {}", itemId, body, e);
             throw e;
         } catch (Exception e) {
-            logger.error("Import failed for itemId: {}", itemId, e);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity("{\"error\": \"Import failed: " + e.getMessage() + "\"}")
-                    .build();
+            logger.error("Import failed for itemId: {}, error: {}", itemId, e.getMessage());
+            throw e;
         }
     }
 }
