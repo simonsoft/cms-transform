@@ -46,7 +46,7 @@
 		</xsl:variable>
 		
 		<!-- Using 'xml' output method will preserve minimized empty tags from input. Actually, 'xml' will minimize all tags that happen to be empty. -->
-		<xsl:result-document method="xml" doctype-public="{$doctype.public}" doctype-system="{$doctype.system}" omit-xml-declaration="{$omit-xml-declaration}">
+		<xsl:result-document method="xml" doctype-public="{$doctype.public}" doctype-system="{$doctype.system}" omit-xml-declaration="{$omit-xml-declaration}" normalization-form="NFC">
 			<!-- A DOCTYPE declaration will be output by Saxon if a doctype-system is present. -->
 			<xsl:apply-templates select="." mode="output"/>
 		</xsl:result-document>
