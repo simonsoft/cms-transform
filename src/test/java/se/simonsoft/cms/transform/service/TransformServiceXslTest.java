@@ -41,6 +41,7 @@ import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
+import se.simonsoft.cms.item.naming.CmsItemNameFactory;
 import se.simonsoft.cms.item.properties.CmsItemProperties;
 import se.simonsoft.cms.reporting.CmsItemLookupReporting;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
@@ -82,8 +83,12 @@ public class TransformServiceXslTest {
 		repoLookup = indexing.getContext().getInstance(CmsRepositoryLookup.class);
 		TransformerServiceFactory transformerServiceFactory = indexing.getContext().getInstance(TransformerServiceFactory.class);
 		XmlSourceReaderS9api sourceReader = indexing.getContext().getInstance(XmlSourceReaderS9api.class);
+		//Map<CmsRepository, CmsItemLookup> lookupMap = new HashMap<>();
+		//lookupMap.put(repo, lookup);
+		//(CmsItemNameFactory nameFactory = new CmsItemNameFactory(lookupMap);
+		CmsItemNameFactory nameFactory = null;
 
-		transformService = new TransformServiceXsl(commit, lookup, lookupReporting, repoLookup, transformerServiceFactory, sourceReader); // may exist a injected version. 
+		transformService = new TransformServiceXsl(commit, lookup, lookupReporting, repoLookup, transformerServiceFactory, sourceReader, nameFactory); // may exist a injected version. 
 	}
 	
 

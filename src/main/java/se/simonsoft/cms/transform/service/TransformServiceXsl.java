@@ -58,6 +58,7 @@ import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsItemNotFoundException;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
+import se.simonsoft.cms.item.naming.CmsItemNameFactory;
 import se.simonsoft.cms.item.naming.CmsItemNamePattern;
 import se.simonsoft.cms.item.naming.CmsItemNaming;
 import se.simonsoft.cms.item.naming.CmsItemNamingShard1K;
@@ -85,6 +86,8 @@ public class TransformServiceXsl implements TransformService {
 	private final TransformerServiceFactory transformerServiceFactory;
 	private final CmsRepositoryLookup repoLookup;
 	private final XmlSourceReaderS9api sourceReader;
+	private final CmsItemNameFactory itemNameFactory;
+	
 	private final TransformerService transformerOutput;
 	
 	private static final String TRANSFORM_LOCK_COMMENT = "Locked for transform";
@@ -97,9 +100,6 @@ public class TransformServiceXsl implements TransformService {
 	private static final int HTTP_URL_CONNECTION_CONNECT_TIMEOUT = 30000;  	// 30 seconds
 	private static final String HTTP_URL_CONNECTION_USER_AGENT = "cms-transform/1.0";
 
-	private static final String CMS_CLASS_SHARDPARENT = "shardparent";
-	private static final String PROPNAME_CONFIG_ITEMNAMEPATTERN = "cmsconfig:ItemNamePattern";
-
 	private static final Logger logger = LoggerFactory.getLogger(TransformServiceXsl.class);
 
 	@Inject
@@ -109,7 +109,8 @@ public class TransformServiceXsl implements TransformService {
 			CmsItemLookupReporting itemLookupReporting,
 			CmsRepositoryLookup lookupRepo,
 			TransformerServiceFactory transfromerServiceFactory,
-			XmlSourceReaderS9api sourceReader
+			XmlSourceReaderS9api sourceReader,
+			CmsItemNameFactory itemNameFactory
 			) {
 		
 		this.commit = commit;
@@ -117,9 +118,10 @@ public class TransformServiceXsl implements TransformService {
 		this.itemLookupReporting = itemLookupReporting;
 		this.repoLookup = lookupRepo;
 		this.transformerServiceFactory = transfromerServiceFactory;
-		this.transformerOutput = transfromerServiceFactory.buildTransformerService(new StreamSource(this.getClass().getClassLoader().getResourceAsStream(OUTPUT_TRANSFORM)));
 		this.sourceReader = sourceReader;
+		this.itemNameFactory = itemNameFactory;
 		
+		this.transformerOutput = transfromerServiceFactory.buildTransformerService(new StreamSource(this.getClass().getClassLoader().getResourceAsStream(OUTPUT_TRANSFORM)));
 		this.itemLookupTransform = new CmsItemLookupTransform(itemLookup, itemLookupReporting);
 	}
 
@@ -198,23 +200,9 @@ public class TransformServiceXsl implements TransformService {
 	}
 
 	@Override
-	public Set<CmsItemId> importItem(CmsItemId item, TransformImportOptions config) {
-		Set<CmsItemId> response = new HashSet<>();
-
-		if (config == null) {
-			throw new IllegalArgumentException("Import requires a valid TransformImportOptions object.");
-		}
-
-		CmsItemPath relPath = item.getRelPath();
-		CmsItemPath parentFolder = relPath.getParent();
-
-		final String url = config.getUrl();
-		final String content = config.getContent();
-		final CmsRepository repository = item.getRepository();
-		final RepoRevision baseRevision = repoLookup.getYoungest(repository);
-		final CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
-		final CmsItemPropertiesMap properties = config.getItemPropertiesMap();
-
+	public CmsItem importItemValidate(CmsItemId itemId, TransformImportOptions config) {
+		final CmsRepository repository = itemId.getRepository();
+		
 		final boolean overwrite = Boolean.parseBoolean(config.getParams().get("overwrite"));
 		if (overwrite) {
 			throw new IllegalArgumentException("The overwrite option is currently not supported.");
@@ -224,33 +212,65 @@ public class TransformServiceXsl implements TransformService {
 		if (pathext == null || pathext.isEmpty()) {
 			throw new IllegalArgumentException("No pathext parameter was supplied.");
 		}
-
+		
+		final CmsItem location;
 		try {
-			if (!itemLookup.getItem(item).getKind().isFolder()) {
-				throw new IllegalArgumentException("Item must be an existing folder: " + item);
+			location = itemLookup.getItem(repository.getItemId(itemId.getRelPath(), null));
+			if (!location.getKind().isFolder()) {
+				throw new IllegalArgumentException("Item must be an existing folder: " + itemId);
 			}
 		} catch (CmsItemNotFoundException e) {
-			throw new IllegalArgumentException("Item must be an existing folder: " + item, e);
+			throw new IllegalArgumentException("Item must be an existing folder: " + itemId, e);
 		}
-
+		
 		final String pathnamebase = config.getParams().get("pathnamebase");
-		final CmsItem location = itemLookup.getItem(repository.getItemId(relPath, null));
-		final CmsItemProperties locationProps = location.getProperties();
-
-		final boolean isShardParent = isCmsClass(locationProps, CMS_CLASS_SHARDPARENT);
-		final boolean hasNamePattern = locationProps.containsProperty(PROPNAME_CONFIG_ITEMNAMEPATTERN);
 		final boolean hasPathnamebase = pathnamebase != null && !pathnamebase.isEmpty();
 
+		final boolean isShardParent = CmsItemNameFactory.isShardParent(location);
+		
 		if (isShardParent) {
-			if (!hasNamePattern) throw new IllegalArgumentException(MessageFormatter.format("Location does not define a name pattern: {}", parentFolder).getMessage());
-			if (hasPathnamebase) throw new IllegalStateException("The pathnamebase is not allowed when the folder is configured a shardparent with a name pattern.");
-			CmsItemNaming itemNaming = new CmsItemNamingShard1K(repository, itemLookup);
-			CmsItemNamePattern namePattern = new CmsItemNamePattern(locationProps.getString(PROPNAME_CONFIG_ITEMNAMEPATTERN));
-			relPath = itemNaming.getItemPath(relPath, namePattern, pathext);
+			if (hasPathnamebase) throw new IllegalArgumentException("The 'pathnamebase' is not allowed when the folder is a shardparent with a name pattern.");
 		} else if (hasPathnamebase) {
-			relPath = relPath.append(String.format("%s.%s", pathnamebase, pathext));
+			// This is fine, keeping same logic as in importItem.
 		} else {
-			throw new IllegalStateException("Either the folder must be configured a shardparent with a name pattern or a pathnamebase parameter must be supplied.");
+			throw new IllegalArgumentException("Either the folder must be a shardparent with a name pattern or a 'pathnamebase' parameter must be supplied.");
+		}
+		
+		return location;
+	}
+	
+	@Override
+	public Set<CmsItemId> importItem(CmsItemId itemId, TransformImportOptions config) {
+		Set<CmsItemId> response = new HashSet<>();
+
+		if (config == null) {
+			throw new IllegalArgumentException("Import requires a valid TransformImportOptions object.");
+		}
+
+		final String url = config.getUrl();
+		final String content = config.getContent();
+		final CmsRepository repository = itemId.getRepository();
+		final RepoRevision baseRevision = repoLookup.getYoungest(repository);
+		final CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
+		final CmsItemPropertiesMap properties = config.getItemPropertiesMap();
+
+
+		final CmsItem location = importItemValidate(itemId, config);
+		CmsItemPath relPath = itemId.getRelPath();
+		final boolean overwrite = Boolean.parseBoolean(config.getParams().get("overwrite"));
+
+		final String pathnamebase = config.getParams().get("pathnamebase");
+		final boolean hasPathnamebase = pathnamebase != null && !pathnamebase.isEmpty();
+
+		final boolean isShardParent = CmsItemNameFactory.isShardParent(location);
+
+		if (isShardParent) {
+			if (hasPathnamebase) throw new IllegalArgumentException("The 'pathnamebase' is not allowed when the folder is a shardparent with a name pattern.");
+			relPath = this.itemNameFactory.getItemPath(location, config.getParams().get("pathext"));
+		} else if (hasPathnamebase) {
+			relPath = relPath.append(String.format("%s.%s", pathnamebase, config.getParams().get("pathext")));
+		} else {
+			throw new IllegalArgumentException("Either the folder must be a shardparent with a name pattern or a 'pathnamebase' parameter must be supplied.");
 		}
 
 		final Set<CmsItemLock> locked = new HashSet<>();
@@ -320,6 +340,7 @@ public class TransformServiceXsl implements TransformService {
 			return true;
 		}
 		CmsItem item = this.itemLookup.getItem(itemId);
+		//return item.isCmsClass("tikahtml");
 		// TODO: Use cms-item method when available.
         return isCmsClass(item.getProperties(), "tikahtml");
     }
