@@ -39,7 +39,6 @@ import javax.xml.transform.stream.StreamSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.slf4j.helpers.MessageFormatter;
 import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
 import se.simonsoft.cms.item.CmsItemKind;
@@ -59,10 +58,6 @@ import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsItemNotFoundException;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
 import se.simonsoft.cms.item.naming.CmsItemNameFactory;
-import se.simonsoft.cms.item.naming.CmsItemNamePattern;
-import se.simonsoft.cms.item.naming.CmsItemNaming;
-import se.simonsoft.cms.item.naming.CmsItemNamingShard1K;
-import se.simonsoft.cms.item.properties.CmsItemProperties;
 import se.simonsoft.cms.item.properties.CmsItemPropertiesMap;
 import se.simonsoft.cms.item.structure.CmsItemClassificationXml;
 import se.simonsoft.cms.reporting.CmsItemLookupReporting;
@@ -340,9 +335,7 @@ public class TransformServiceXsl implements TransformService {
 			return true;
 		}
 		CmsItem item = this.itemLookup.getItem(itemId);
-		//return item.isCmsClass("tikahtml");
-		// TODO: Use cms-item method when available.
-        return isCmsClass(item.getProperties(), "tikahtml");
+		return item.isCmsClass("tikahtml");
     }
 	
 	private Set<CmsItemLock> transformItem(CmsItemId baseItemId, TransformConfig config, TransformerService transformerService, TransformOptions transformOptions, CmsPatchset patchset) {
@@ -566,20 +559,6 @@ public class TransformServiceXsl implements TransformService {
         return href;
 	}
 	
-	private static boolean isCmsClass(CmsItemProperties properties, String cmsClass) {
-
-		if (properties == null) {
-			return false;
-		}
-
-		String classes = properties.getString("cms:class");
-		if (classes == null || classes.isEmpty()) {
-			return false;
-		}
-		
-		String[] a = classes.split(" ");
-		return Arrays.asList(a).contains(cmsClass);
-	}
 	
 	private class EmptyStreamException extends Exception {
 
