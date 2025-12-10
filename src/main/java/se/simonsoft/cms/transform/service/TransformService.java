@@ -15,10 +15,23 @@
  */
 package se.simonsoft.cms.transform.service;
 
+import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
+import se.simonsoft.cms.transform.config.databind.TransformImportOptions;
+
+import java.util.Set;
 
 public interface TransformService {
 	
 	void transform(CmsItemId item, TransformConfig config);
+
+	Set<CmsItemId> importItem(CmsItemId itemId, TransformImportOptions config);
+
+	/**
+	 * @param item
+	 * @param config
+	 * @return the folder CmsItem where validation was performed
+	 */
+	CmsItem importItemValidate(CmsItemId itemId, TransformImportOptions config);
 }
