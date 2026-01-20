@@ -22,7 +22,7 @@ import se.simonsoft.cms.item.CmsItemId;
 import se.simonsoft.cms.item.workflow.WorkflowItemInputUserId;
 import se.simonsoft.cms.transform.config.databind.TransformImportOptions;
 
-class TransformImportWorkflowInput implements WorkflowItemInputUserId {
+public class TransformImportWorkflowInput implements WorkflowItemInputUserId {
 
 	private final CmsItemId itemId;
 	private final TransformImportOptions options;
