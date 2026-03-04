@@ -174,7 +174,7 @@ public class TransformServiceXslTest {
 			transformService.transform(itemId, config);
 			fail("Should fail, item already exist but overwrite is not set.");
 		} catch(IllegalStateException e) {
-			assertEquals("Item already exists, config prohibiting overwrite of existing items.", e.getMessage());
+			assertEquals("Item already exists, config prohibiting overwrite of existing items: /doc/transform-test.xml", e.getMessage());
 		}
 
 		//Adding overwrite false to config to test when value is set.
@@ -184,7 +184,7 @@ public class TransformServiceXslTest {
 			transformService.transform(itemId, config);
 			fail("Should fail, item already exist but overwrite is set to false.");
 		} catch(IllegalStateException e) {
-			assertEquals("Item already exists, config prohibiting overwrite of existing items.", e.getMessage());
+			assertEquals("Item already exists, config prohibiting overwrite of existing items: /doc/transform-test.xml", e.getMessage());
 		}
 	}
 
@@ -369,7 +369,7 @@ public class TransformServiceXslTest {
 			transformService.transform(itemId, config);
 			fail("Should fail, item already exist but overwrite is set to false.");
 		} catch(IllegalStateException e) {
-			assertEquals("Item already exists, config prohibiting overwrite of existing items.", e.getMessage());
+			assertEquals("Item already exists, config prohibiting overwrite of existing items: /doc/transform-test.xml", e.getMessage());
 		}
 
 		//Adding overwrite false to config to test when value is set.
@@ -379,7 +379,7 @@ public class TransformServiceXslTest {
 			transformService.transform(itemId, config);
 			fail("Should fail, item already exist but overwrite is set to false.");
 		} catch(IllegalStateException e) {
-			assertEquals("Item already exists, config prohibiting overwrite of existing items.", e.getMessage());
+			assertEquals("Item already exists, config prohibiting overwrite of existing items: /doc/transform-test.xml", e.getMessage());
 		}
 	}
 
