@@ -166,7 +166,7 @@ public class TransformServiceXsl implements TransformService {
 			// Workaround for backend returning itemIds with p=-1, remove when fixed in backend. 
 			// Never transforms non-head anyway.
 			files.stream().filter(fileId -> isTransformable(fileId)).forEach(fileId -> items.add(fileId.withPegRev(null)));
-			logger.info("Transforming {} of {} items in folder: {}", items.size(), files.size(), baseItemId);
+			logger.info("Transform proceeding with {} of {} items in folder: {}", items.size(), files.size(), baseItemId);
 		} else {
 			items.add(baseItemId);
 		}
@@ -342,6 +342,7 @@ public class TransformServiceXsl implements TransformService {
 		
 		logger.debug("Transforming itemid: {}", baseItemId);
 		final CmsItemPropertiesMap props = getProperties(baseItemId, config);
+		// Output path can be null if explicitly set to empty string.
 		final CmsItemPath outputPath = getOutputPath(baseItemId, config.getOptions().getParams().get("output"));
 		final boolean overwrite = Boolean.valueOf(config.getOptions().getParams().get("overwrite"));
 		final Set<CmsItemLock> locked = new HashSet<>();
@@ -352,19 +353,34 @@ public class TransformServiceXsl implements TransformService {
 		try {
 			
 			TransformStreamProvider baseStreamProvider = transformerService.getTransformStreamProvider(baseItemId, transformOptions);
-			locked.add(addToPatchset(patchset, outputPath.append(baseItemId.getRelPath().getName()), baseStreamProvider.get(), overwrite, props));
+			// Detects empty stream and aborts them via EmptyStreamException, which is caught and logged as warning.
+			// Assume only non-principal output if the output path is explicitly set to repo root.
+			if (outputPath != null) {
+				locked.add(addToPatchset(patchset, outputPath.append(baseItemId.getRelPath().getName()), baseStreamProvider.get(), overwrite, props));
+			} else {
+				// Discard the principal output.
+				baseStreamProvider.get();
+			}
 			
 			Set<String> resultDocsHrefs = outputURIResolver.getResultDocumentHrefs();
 			for (String href: resultDocsHrefs) {
-				if (href.startsWith("/")) {
+				if (href.startsWith("/") && outputPath != null) {
 					throw new IllegalArgumentException("Relative href must not start with slash: " + href);
+				}
+				String decodedHref = decodeHref(href); // Items will be commited with decoded hrefs.
+				CmsItemPath path;
+				if (outputPath != null) {
+					path = outputPath.append(Arrays.asList(decodedHref.split("/")));
+				} else {
+					try {
+						path = new CmsItemPath(decodedHref);
+					} catch (IllegalArgumentException e) {
+						throw new IllegalArgumentException("The href must be a valid CmsItemPath when output path is configured to repository root: " + decodedHref, e);
+					}
 				}
 				
 				XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(href);
 				TransformStreamProvider streamProvider = transformerOutput.getTransformStreamProvider(resultDocument, null);
-				
-				String decodedHref = decodeHref(href); // Items will be commited with decoded hrefs.
-				CmsItemPath path = outputPath.append(Arrays.asList(decodedHref.split("/")));
 				locked.add(addToPatchset(patchset, path, streamProvider.get(), overwrite, props));
 			}
 		} catch (RuntimeException e) {
@@ -437,7 +453,7 @@ public class TransformServiceXsl implements TransformService {
 				fileMod.setPropertyChange(properties);
 				patchset.add(fileMod);
 			} else {
-				throw new IllegalStateException("Item already exists, config prohibiting overwrite of existing items.");
+				throw new IllegalStateException("Item already exists, config prohibiting overwrite of existing items: " + relPath);
 			}
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to read stream from transform.", e);
@@ -451,9 +467,12 @@ public class TransformServiceXsl implements TransformService {
 		
 		CmsItemPath pathResult;
 		
-		if (output == null || output.trim().isEmpty()) {
+		if (output == null) {
 			pathResult = itemId.getRepository().getItemId().withRelPath(itemId.getRelPath().getParent()).getRelPath();
 			logger.debug("Output folder is not specified will default to items parent folder.");
+		} else if (output.trim().isEmpty()) {
+			pathResult = null; // Output path is explicitly set to empty, which is interpreted as repository root.
+			logger.debug("Output folder is explicitly set to empty string which means repository root.");
 		} else {
 			pathResult = itemId.getRepository().getItemId().withRelPath(new CmsItemPath(output)).getRelPath();
 			logger.debug("Output folder is specified: {}", output);
