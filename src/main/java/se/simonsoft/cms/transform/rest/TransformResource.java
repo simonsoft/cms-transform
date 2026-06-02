@@ -61,6 +61,8 @@ public class TransformResource {
         this.objectWriter = objectWriter;
     }
 
+    // NOTE: This endpoint is NOT yet finalized as an API. Should likely be async via Sfn.
+    // The import functionality is likely functional via Sfn if creating the executions via aws cli.
     @POST
     @Path("api/import")
     @Consumes(MediaType.APPLICATION_JSON)
