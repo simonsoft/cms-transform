@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import javax.inject.Inject;
@@ -189,7 +190,9 @@ public class TransformServiceXsl implements TransformService {
 		if (completeMessage != null && !completeMessage.trim().isEmpty()) {
 			patchset.setHistoryMessage(completeMessage);
 		}
-		
+
+		applyRevisionProperties(patchset, config.getOptions().getRevprops());
+
 		RepoRevision r = commit.run(patchset);
 		logger.debug("Transform complete, commited with rev: {}", r.getNumber());
 	}
@@ -428,6 +431,30 @@ public class TransformServiceXsl implements TransformService {
 		return sb.toString();
 	}
 
+
+	/**
+	 * Applies configured SVN revision properties to the patchset.
+	 * Keys must follow the codebase's 'prefix:name' convention (e.g. abx:TransformBase, cms:rid).
+	 */
+	void applyRevisionProperties(CmsPatchset patchset, Map<String, String> revprops) {
+		if (revprops == null || revprops.isEmpty()) {
+			return;
+		}
+		for (String key : revprops.keySet()) {
+			validateRevpropKey(key);
+		}
+		for (Map.Entry<String, String> entry : revprops.entrySet()) {
+			patchset.setRevisionProperty(entry.getKey(), entry.getValue());
+		}
+	}
+
+	void validateRevpropKey(String key) {
+		String[] parts = key == null ? new String[0] : key.split(":", -1);
+		if (parts.length != 2 || parts[0].isEmpty() || parts[1].isEmpty()) {
+			throw new IllegalArgumentException(
+					"Invalid revprop key: '" + key + "'. Must have the form 'prefix:name' (exactly one colon), e.g. 'cms:Move'.");
+		}
+	}
 
 	private CmsItemLock addToPatchset(CmsPatchset patchset, CmsItemPath relPath, InputStream stream, boolean overwrite, CmsItemPropertiesMap properties) {
 		CmsItemLock lock = null;

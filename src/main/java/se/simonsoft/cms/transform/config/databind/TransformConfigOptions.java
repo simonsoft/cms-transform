@@ -19,24 +19,33 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class TransformConfigOptions {
-	
+
 	private String type;
 	private Map <String, String> params = new HashMap<>();
-	
+	private Map <String, String> revprops = new HashMap<>(); // SVN revision properties to set on the transform's commit. Keys must be 'prefix:name'.
+
 	public String getType() {
 		return type;
 	}
-	
+
 	public void setType(String type) {
 		this.type = type;
 	}
-	
+
 	public Map <String, String> getParams() {
 		return params;
 	}
-	
+
 	public void setParams(Map <String, String> params) {
 		this.params = params;
 	}
-	
+
+	public Map <String, String> getRevprops() {
+		return revprops;
+	}
+
+	public void setRevprops(Map <String, String> revprops) {
+		this.revprops = revprops;
+	}
+
 }
