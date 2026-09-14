@@ -38,6 +38,7 @@ import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
 import se.simonsoft.cms.item.CmsItemPath;
 import se.simonsoft.cms.item.CmsRepository;
+import se.simonsoft.cms.item.commit.CmsPatchset;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
@@ -226,7 +227,120 @@ public class TransformServiceXslTest {
 		String string = baos.toString(StandardCharsets.UTF_8.name());
 		assertTrue(string.contains("single-output=\"true\""));
 	}
-	
+
+	@Test
+	public void testApplyRevisionPropertiesValid() {
+		CmsPatchset patchset = new CmsPatchset(repo, repoLookup.getYoungest(repo));
+		Map<String, String> revprops = new HashMap<String, String>();
+		revprops.put("cms:Move", "true");
+		revprops.put("abx:Test", "value");
+
+		((TransformServiceXsl) transformService).applyRevisionProperties(patchset, revprops);
+
+		assertEquals("true", patchset.getRevisionProperties().getString("cms:Move"));
+		assertEquals("value", patchset.getRevisionProperties().getString("abx:Test"));
+	}
+
+	@Test
+	public void testApplyRevisionPropertiesNullIsNoop() {
+		CmsPatchset patchset = new CmsPatchset(repo, repoLookup.getYoungest(repo));
+
+		((TransformServiceXsl) transformService).applyRevisionProperties(patchset, null);
+
+		assertTrue(patchset.getRevisionProperties().getKeySet().isEmpty());
+	}
+
+	@Test
+	public void testApplyRevisionPropertiesInvalidKeyNoColon() {
+		CmsPatchset patchset = new CmsPatchset(repo, repoLookup.getYoungest(repo));
+		Map<String, String> revprops = new HashMap<String, String>();
+		revprops.put("InvalidKeyNoColon", "value");
+
+		try {
+			((TransformServiceXsl) transformService).applyRevisionProperties(patchset, revprops);
+			fail("Should fail, revprop key must have the form 'prefix:name'.");
+		} catch (IllegalArgumentException e) {
+			assertEquals("Invalid revprop key: 'InvalidKeyNoColon'. Must have the form 'prefix:name' (exactly one colon), e.g. 'cms:Move'.", e.getMessage());
+		}
+		assertTrue("No revprops should have been set when validation fails.", patchset.getRevisionProperties().getKeySet().isEmpty());
+	}
+
+	@Test
+	public void testApplyRevisionPropertiesInvalidKeyEmptyPrefix() {
+		CmsPatchset patchset = new CmsPatchset(repo, repoLookup.getYoungest(repo));
+		Map<String, String> revprops = new HashMap<String, String>();
+		revprops.put(":name", "value");
+
+		try {
+			((TransformServiceXsl) transformService).applyRevisionProperties(patchset, revprops);
+			fail("Should fail, revprop key must have a non-empty prefix.");
+		} catch (IllegalArgumentException e) {
+			assertEquals("Invalid revprop key: ':name'. Must have the form 'prefix:name' (exactly one colon), e.g. 'cms:Move'.", e.getMessage());
+		}
+	}
+
+	@Test
+	public void testRevisionPropertiesInvalidKeyAbortsTransformBeforeCommit() throws Exception {
+		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
+
+		TransformConfig config = new TransformConfig();
+		config.setActive(true);
+
+		TransformConfigOptions configOptions = new TransformConfigOptions();
+		configOptions.setType("xsl");
+
+		Map<String, String> optionsParams = new HashMap<String, String>();
+		optionsParams.put("stylesheet", "/stylesheet/transform-single-output.xsl");
+		optionsParams.put("overwrite", "true");
+		optionsParams.put("comment", "Automatic transform!");
+		configOptions.setParams(optionsParams);
+
+		Map<String, String> revprops = new HashMap<String, String>();
+		revprops.put("InvalidKeyNoColon", "value");
+		configOptions.setRevprops(revprops);
+
+		config.setOptions(configOptions);
+
+		try {
+			transformService.transform(itemId, config);
+			fail("Should fail, revprop key must have the form 'prefix:name'.");
+		} catch (IllegalArgumentException e) {
+			assertEquals("Invalid revprop key: 'InvalidKeyNoColon'. Must have the form 'prefix:name' (exactly one colon), e.g. 'cms:Move'.", e.getMessage());
+		}
+	}
+
+	@Test
+	public void testRevisionPropertiesValidDoesNotBreakTransform() throws Exception {
+		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
+
+		TransformConfig config = new TransformConfig();
+		config.setActive(true);
+
+		TransformConfigOptions configOptions = new TransformConfigOptions();
+		configOptions.setType("xsl");
+
+		Map<String, String> optionsParams = new HashMap<String, String>();
+		optionsParams.put("stylesheet", "/stylesheet/transform-single-output.xsl");
+		optionsParams.put("overwrite", "true");
+		optionsParams.put("comment", "Automatic transform!");
+		configOptions.setParams(optionsParams);
+
+		Map<String, String> revprops = new HashMap<String, String>();
+		revprops.put("cms:Move", "true");
+		configOptions.setRevprops(revprops);
+
+		config.setOptions(configOptions);
+
+		transformService.transform(itemId, config);
+
+		CmsItem itemNew = lookup.getItem(itemId);
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		itemNew.getContents(baos);
+
+		String string = baos.toString(StandardCharsets.UTF_8.name());
+		assertTrue(string.contains("single-output=\"true\""));
+	}
+
 	@Test
 	public void testMultipleOutputFolderDoNotExist() throws Exception {
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
