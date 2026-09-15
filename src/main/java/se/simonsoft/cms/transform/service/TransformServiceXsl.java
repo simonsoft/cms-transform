@@ -159,7 +159,16 @@ public class TransformServiceXsl implements TransformService {
 		
 		final CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
 		TransformOptions transformOptions = new TransformOptions();
-		
+		// Custom parameters, same convention as ReleaseExportOptions: a params entry whose key is all
+		// lowercase (optionally with digits/hyphens) is forwarded to the XSL transform as a stylesheet
+		// parameter. Setting a parameter that is not declared in the stylesheet does not trigger failure
+		// (Saxon 9.7), so this can forward unconditionally without excluding the well-known keys above.
+		for (Map.Entry<String, String> e : config.getOptions().getParams().entrySet()) {
+			if (e.getKey().matches("^[a-z][a-z0-9-]{1,100}")) {
+				transformOptions.setParameter(e.getKey(), e.getValue());
+			}
+		}
+
 		Set<CmsItemId> items = new LinkedHashSet<>();
 		if (item.getKind() == CmsItemKind.Folder) {
 			Set<CmsItemId> files = itemLookup.getImmediateFiles(baseItemId);
