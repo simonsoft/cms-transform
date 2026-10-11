@@ -63,6 +63,7 @@ public class TransformServiceXslSchemaTest {
 
 	private static final String transformTestDoc = "x-svn:///svn/repo1/doc/transform-test.xml";
 	private static final String transformTestMap = "x-svn:///svn/repo1/doc/transform-test-map.xml";
+	private static final String transformTestDocStrict = "x-svn:///svn/repo1/strict/transform-test.xml";
 
 	@Before
 	public void setup() throws Exception {
@@ -186,7 +187,7 @@ public class TransformServiceXslSchemaTest {
 		long youngest = repoLookup.getYoungest(repo).getNumber();
 		Map<String, String> params = new HashMap<>();
 		params.put("SchemaValidate", "true");
-		params.put("SchemaQname", "strict"); // The strict schema application does not allow subtitle.
+		params.put("SchemaQualifiedName", "strict"); // The strict schema application does not allow subtitle.
 
 		try {
 			transformService.transform(new CmsItemIdArg(transformTestDoc), getConfig(params));
@@ -202,7 +203,7 @@ public class TransformServiceXslSchemaTest {
 		long youngest = repoLookup.getYoungest(repo).getNumber();
 		Map<String, String> params = new HashMap<>();
 		params.put("SchemaValidate", "true");
-		params.put("SchemaQname", "nonexisting");
+		params.put("SchemaQualifiedName", "nonexisting");
 
 		try {
 			transformService.transform(new CmsItemIdArg(transformTestDoc), getConfig(params));
@@ -211,6 +212,36 @@ public class TransformServiceXslSchemaTest {
 			assertEquals("Schema file is missing: nonexisting/ditabase.s.rng", e.getMessage());
 		}
 		assertNotCommittedAndUnlocked(youngest);
+	}
+
+	@Test
+	public void testSchemaQualifiedNameConfigured() throws Exception {
+		long youngest = repoLookup.getYoungest(repo).getNumber();
+		Map<String, String> params = new HashMap<>();
+		params.put("SchemaValidate", "true");
+
+		// Project /strict is configured with cmsconfig:SchemaQualifiedName = strict.
+		try {
+			transformService.transform(new CmsItemIdArg(transformTestDocStrict), getConfig(params));
+			fail("Should fail schema validation");
+		} catch (IllegalStateException e) {
+			assertEquals("Schema validation failed: 1 of 2 items, 1 issues", e.getMessage());
+		}
+		assertEquals("nothing committed", youngest, repoLookup.getYoungest(repo).getNumber());
+	}
+
+	@Test
+	public void testSchemaQualifiedNameParamOverridesConfigured() throws Exception {
+		Map<String, String> params = new HashMap<>();
+		params.put("SchemaValidate", "true");
+		params.put("SchemaQualifiedName", "nonexisting");
+
+		try {
+			transformService.transform(new CmsItemIdArg(transformTestDocStrict), getConfig(params));
+			fail("Should fail, unknown schema application");
+		} catch (IllegalArgumentException e) {
+			assertEquals("Schema file is missing: nonexisting/ditabase.s.rng", e.getMessage());
+		}
 	}
 
 	@Test

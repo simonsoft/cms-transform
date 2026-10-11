@@ -63,6 +63,7 @@ import se.simonsoft.cms.item.commit.CmsPatchset;
 import se.simonsoft.cms.item.commit.FileAdd;
 import se.simonsoft.cms.item.commit.FileModificationLocked;
 import se.simonsoft.cms.item.commit.FolderExist;
+import se.simonsoft.cms.item.config.CmsResourceContext;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsItemNotFoundException;
@@ -107,7 +108,8 @@ public class TransformServiceXsl implements TransformService {
 
 	// Schema validation params, CamelCase keys are not forwarded to the XSL.
 	private static final String PARAM_SCHEMA_VALIDATE = "SchemaValidate";
-	private static final String PARAM_SCHEMA_QNAME = "SchemaQname";
+	// Same name as the config option used by release and Fonto (ReleaseConfiguration in cms-release).
+	private static final String PARAM_SCHEMA_QUALIFIED_NAME = "SchemaQualifiedName";
 	private static final String PARAM_SCHEMA_VARIANT = "SchemaVariant";
 	static final String SCHEMA_VARIANT_DITABASE = "ditabase";
 	static final String SCHEMA_VARIANT_DITAMAP = "ditamap";
@@ -220,7 +222,7 @@ public class TransformServiceXsl implements TransformService {
 		
 		if (schemaValidate) {
 			try {
-				validateSchema(patchset, config.getOptions().getParams());
+				validateSchema(patchset, config.getOptions().getParams(), baseItemId);
 			} catch (RuntimeException e) {
 				// Nothing is committed if any item fails validation.
 				unlockItemsFailure(locked);
@@ -329,7 +331,7 @@ public class TransformServiceXsl implements TransformService {
 			}
 			CmsItemLock lock = addToPatchset(patchset, relPath, stream, overwrite, properties, schemaValidate);
 			if (lock != null) locked.add(lock);
-			if (schemaValidate) validateSchema(patchset, config.getParams());
+			if (schemaValidate) validateSchema(patchset, config.getParams(), itemId);
 			String comment = config.getParams().get("comment");
 			if (comment != null && !comment.trim().isEmpty()) patchset.setHistoryMessage(comment);
 			RepoRevision r = commit.run(patchset);
@@ -643,10 +645,11 @@ public class TransformServiceXsl implements TransformService {
 
 	/**
 	 * Validates all XML items in the patchset, all issues are logged before failing.
+	 * @param contextItemId the schema is configured for the project of this item, unless given as a param
 	 * @throws IllegalStateException if one or more items fail validation
 	 */
-	private void validateSchema(CmsPatchset patchset, Map<String, String> params) {
-		final Optional<String> qname = getParamOptional(params, PARAM_SCHEMA_QNAME);
+	private void validateSchema(CmsPatchset patchset, Map<String, String> params, CmsItemId contextItemId) {
+		final Optional<String> qname = getSchemaQualifiedName(params, contextItemId);
 		final Optional<String> variantParam = getParamOptional(params, PARAM_SCHEMA_VARIANT);
 		final CmsItemClassificationXml classification = new CmsItemClassificationXml();
 		int itemCount = 0;
@@ -697,6 +700,26 @@ public class TransformServiceXsl implements TransformService {
 		}
 	}
 
+	/**
+	 * @return the param if given, otherwise the config option at project level (like ReleaseConfiguration in cms-release), empty for the built-in schema
+	 */
+	private Optional<String> getSchemaQualifiedName(Map<String, String> params, CmsItemId contextItemId) {
+		Optional<String> param = getParamOptional(params, PARAM_SCHEMA_QUALIFIED_NAME);
+		if (param.isPresent()) {
+			return param;
+		}
+		// Project level is the first folder.
+		CmsItemPath projectPath = contextItemId.getRelPath();
+		while (projectPath != null && projectPath.getSize() > 1) {
+			projectPath = projectPath.getParent();
+		}
+		CmsResourceContext context = repoLookup.getConfig(contextItemId.getRepository().getItemId(projectPath, null), CmsItemKind.Folder);
+		if (context.hasConfigOption(PARAM_SCHEMA_QUALIFIED_NAME)) {
+			return Optional.of(context.getConfigOption(PARAM_SCHEMA_QUALIFIED_NAME).getValueString());
+		}
+		return Optional.empty();
+	}
+	
 	/**
 	 * @param rootElementName local name, null if unknown
 	 * @return ditamap for maps and map specializations (e.g. techdocmap, keydefmap), otherwise ditabase
