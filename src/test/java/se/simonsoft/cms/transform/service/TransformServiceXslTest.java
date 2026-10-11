@@ -89,7 +89,7 @@ public class TransformServiceXslTest {
 		//(CmsItemNameFactory nameFactory = new CmsItemNameFactory(lookupMap);
 		CmsItemNameFactory nameFactory = null;
 
-		transformService = new TransformServiceXsl(commit, lookup, lookupReporting, repoLookup, transformerServiceFactory, sourceReader, nameFactory); // may exist a injected version. 
+		transformService = new TransformServiceXsl(commit, lookup, lookupReporting, repoLookup, transformerServiceFactory, sourceReader, nameFactory, null); // may exist a injected version. 
 	}
 	
 
