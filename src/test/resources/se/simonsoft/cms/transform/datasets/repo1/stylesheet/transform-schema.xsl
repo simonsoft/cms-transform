@@ -33,7 +33,7 @@
         <xsl:copy>
             <xsl:apply-templates select="@* | node()" />
         </xsl:copy>
-        <xsl:result-document href="transform-test-map.xml">
+        <xsl:result-document href="transform-test-map.ditamap">
             <techdocmap>
                 <title><xsl:value-of select="title"/></title>
                 <xsl:for-each select="body/section">

@@ -39,10 +39,6 @@ import java.util.Set;
 
 import javax.inject.Inject;
 import javax.inject.Provider;
-import javax.xml.stream.XMLInputFactory;
-import javax.xml.stream.XMLStreamConstants;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamReader;
 import javax.xml.transform.stream.StreamSource;
 
 import org.slf4j.Logger;
@@ -511,6 +507,7 @@ public class TransformServiceXsl implements TransformService {
 		try {
 			final InputStream inputStream = getInputStreamNotEmpty(stream);
 			// Schema validation reads the contents from the patchset before commit, requires repeatable reads.
+			// Transform output is already in memory (ByteArrayInputStream from TransformStreamProvider), buffering copies it.
 			final Provider<InputStream> contents = repeatable ? getContentsBuffered(inputStream) : () -> inputStream;
 			boolean pathExists = pathExists(patchset.getRepository(), relPath);
 			if (!pathExists) {
@@ -662,7 +659,7 @@ public class TransformServiceXsl implements TransformService {
 				continue;
 			}
 			final CmsPatchItem.SupportsContent item = (CmsPatchItem.SupportsContent) patchItem;
-			final String variant = variantParam.orElseGet(() -> getSchemaVariant(getRootElementName(item)));
+			final String variant = variantParam.orElse(getSchemaVariant(path));
 			logger.debug("Schema validation of {} with schema {} {}", path, qname.orElse("(built-in)"), variant);
 			itemCount++;
 
@@ -721,37 +718,13 @@ public class TransformServiceXsl implements TransformService {
 	}
 	
 	/**
-	 * @param rootElementName local name, null if unknown
-	 * @return ditamap for maps and map specializations (e.g. techdocmap, keydefmap), otherwise ditabase
+	 * @return ditamap for the file extension .ditamap, otherwise ditabase (like ReleaseSchema in cms-release)
 	 */
-	static String getSchemaVariant(String rootElementName) {
-		if (rootElementName != null && rootElementName.endsWith("map")) {
+	static String getSchemaVariant(CmsItemPath path) {
+		if (SCHEMA_VARIANT_DITAMAP.equals(path.getExtension())) {
 			return SCHEMA_VARIANT_DITAMAP;
 		}
 		return SCHEMA_VARIANT_DITABASE;
-	}
-
-	private String getRootElementName(CmsPatchItem.SupportsContent item) {
-		XMLInputFactory factory = XMLInputFactory.newInstance();
-		factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
-		try (InputStream xml = item.getWorkingFile()) {
-			XMLStreamReader reader = factory.createXMLStreamReader(xml);
-			try {
-				while (reader.hasNext()) {
-					if (reader.next() == XMLStreamConstants.START_ELEMENT) {
-						return reader.getLocalName();
-					}
-				}
-			} finally {
-				reader.close();
-			}
-		} catch (XMLStreamException e) {
-			// Not well-formed, reported by the schema validation.
-			logger.debug("Failed to read root element of {}: {}", item.getPath(), e.getMessage());
-		} catch (IOException e) {
-			throw new UncheckedIOException(e);
-		}
-		return null;
 	}
 
 	private Optional<String> getParamOptional(Map<String, String> params, String key) {

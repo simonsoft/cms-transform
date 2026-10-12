@@ -35,6 +35,7 @@ import se.simonsoft.cms.backend.filexml.FilexmlCommit;
 import se.simonsoft.cms.backend.filexml.FilexmlSourceClasspath;
 import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
+import se.simonsoft.cms.item.CmsItemPath;
 import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
@@ -62,7 +63,7 @@ public class TransformServiceXslSchemaTest {
 	private TransformService transformService;
 
 	private static final String transformTestDoc = "x-svn:///svn/repo1/doc/transform-test.xml";
-	private static final String transformTestMap = "x-svn:///svn/repo1/doc/transform-test-map.xml";
+	private static final String transformTestMap = "x-svn:///svn/repo1/doc/transform-test-map.ditamap";
 	private static final String transformTestDocStrict = "x-svn:///svn/repo1/strict/transform-test.xml";
 
 	@Before
@@ -128,16 +129,11 @@ public class TransformServiceXslSchemaTest {
 	}
 
 	@Test
-	public void testSchemaVariantFromRootElement() {
-		assertEquals("ditamap", TransformServiceXsl.getSchemaVariant("map"));
-		assertEquals("ditamap", TransformServiceXsl.getSchemaVariant("techdocmap"));
-		assertEquals("ditamap", TransformServiceXsl.getSchemaVariant("keydefmap"));
-		assertEquals("ditamap", TransformServiceXsl.getSchemaVariant("bookmap"));
-		assertEquals("ditabase", TransformServiceXsl.getSchemaVariant("topic"));
-		assertEquals("ditabase", TransformServiceXsl.getSchemaVariant("task"));
-		assertEquals("ditabase", TransformServiceXsl.getSchemaVariant("dita"));
-		assertEquals("ditabase", TransformServiceXsl.getSchemaVariant("document"));
-		assertEquals("ditabase", TransformServiceXsl.getSchemaVariant(null));
+	public void testSchemaVariantFromExtension() {
+		assertEquals("ditamap", TransformServiceXsl.getSchemaVariant(new CmsItemPath("/doc/map.ditamap")));
+		assertEquals("ditabase", TransformServiceXsl.getSchemaVariant(new CmsItemPath("/doc/topic.dita")));
+		assertEquals("ditabase", TransformServiceXsl.getSchemaVariant(new CmsItemPath("/doc/topic.xml")));
+		assertEquals("ditabase", TransformServiceXsl.getSchemaVariant(new CmsItemPath("/doc/keydefmap.xml")));
 	}
 
 	@Test
@@ -294,7 +290,7 @@ public class TransformServiceXslSchemaTest {
 		CmsItemId folder = new CmsItemIdArg("x-svn:///svn/repo1/doc");
 		Map<String, String> params = new HashMap<>();
 		params.put("pathnamebase", "imported");
-		params.put("pathext", "xml");
+		params.put("pathext", "ditamap");
 		params.put("SchemaValidate", "true");
 		TransformImportOptions options = new TransformImportOptions();
 		options.setParams(params);
