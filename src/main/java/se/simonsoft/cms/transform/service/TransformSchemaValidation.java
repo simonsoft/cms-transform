@@ -30,6 +30,7 @@ import org.xml.sax.SAXParseException;
 
 import se.simonsoft.cms.item.CmsItemPath;
 import se.simonsoft.cms.item.CmsRepository;
+import se.simonsoft.cms.item.stream.ByteArrayInOutStream;
 import se.simonsoft.cms.item.structure.CmsItemClassificationXml;
 import se.simonsoft.cms.transform.schema.TransformSchemaService;
 import se.simonsoft.cms.xmlsource.validation.SchemaValidationError;
@@ -71,27 +72,28 @@ class TransformSchemaValidation {
 	/**
 	 * Validates XML items, other items are returned as is.
 	 * @param content the content that will be committed, consumed
-	 * @return the same content, buffered when validated
+	 * @return the same content, to be added to the patchset
 	 */
 	InputStream validate(CmsItemPath path, InputStream content) {
 		if (!classification.isXml(repository.getItemId().withRelPath(path))) {
 			return content;
 		}
-		final byte[] bytes;
-		try {
-			bytes = content.readAllBytes();
-		} catch (IOException e) {
-			throw new UncheckedIOException("Failed to read stream from transform.", e);
-		}
+		// Transform output is a ByteArrayInputStream (TransformStreamProvider), re-read with reset() without copying.
+		final ByteArrayInputStream xml = content instanceof ByteArrayInputStream ? (ByteArrayInputStream) content : buffer(content);
+		xml.mark(0);
 		// Empty output is discarded when added to the patchset, same check.
-		if (bytes.length == 0 || TransformServiceXsl.emptyExceptDeclaration(new String(bytes, 0, Math.min(bytes.length, 200), StandardCharsets.UTF_8))) {
-			return new ByteArrayInputStream(bytes);
+		final byte[] start = new byte[200];
+		final int len = Math.max(xml.read(start, 0, start.length), 0);
+		xml.reset();
+		if (len == 0 || TransformServiceXsl.emptyExceptDeclaration(new String(start, 0, len, StandardCharsets.UTF_8))) {
+			return xml;
 		}
 
 		final String itemVariant = variant.orElse(getSchemaVariant(path));
 		logger.debug("Schema validation of {} with schema {} {}", path, qname.orElse("(built-in)"), itemVariant);
 		itemCount++;
-		List<SchemaValidationError> errors = validate(itemVariant, bytes);
+		List<SchemaValidationError> errors = validate(itemVariant, xml);
+		xml.reset(); // ByteArrayInputStream.close() has no effect.
 		if (!errors.isEmpty()) {
 			itemFailedCount++;
 			issueCount += errors.size();
@@ -99,7 +101,18 @@ class TransformSchemaValidation {
 				logger.warn("Schema validation {} in {} (line {}, column {}): {}", error.getLevel(), path, error.getLineNumber(), error.getColumnNumber(), error.getMessage());
 			}
 		}
-		return new ByteArrayInputStream(bytes);
+		return xml;
+	}
+
+	// Other streams, e.g. import from URL.
+	private static ByteArrayInputStream buffer(InputStream content) {
+		ByteArrayInOutStream buffer = new ByteArrayInOutStream();
+		try (InputStream in = content) {
+			in.transferTo(buffer);
+		} catch (IOException e) {
+			throw new UncheckedIOException("Failed to read content for schema validation.", e);
+		}
+		return buffer.getInputStream();
 	}
 
 	/**
@@ -112,9 +125,9 @@ class TransformSchemaValidation {
 		logger.info("Schema validation passed: {} items", itemCount);
 	}
 
-	private List<SchemaValidationError> validate(String itemVariant, byte[] bytes) {
+	private List<SchemaValidationError> validate(String itemVariant, InputStream xml) {
 		try {
-			schemaService.validate(qname, itemVariant, new ByteArrayInputStream(bytes));
+			schemaService.validate(qname, itemVariant, xml);
 			return Collections.emptyList();
 		} catch (SchemaValidationException e) {
 			return e.getErrors();
