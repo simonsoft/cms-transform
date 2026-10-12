@@ -19,7 +19,8 @@
 <!-- Produces a topic (principal output) and a map (result document), optionally with schema issues. -->
 <xsl:stylesheet version="2.0"
     xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
-    xmlns:cms="http://www.simonsoft.se/namespace/cms">
+    xmlns:cms="http://www.simonsoft.se/namespace/cms"
+    exclude-result-prefixes="cms">
     <xsl:output method="xml" indent="yes" />
 
     <xsl:param name="invalid" select="'false'"/>
