@@ -130,10 +130,10 @@ public class TransformServiceXslSchemaTest {
 
 	@Test
 	public void testSchemaVariantFromExtension() {
-		assertEquals("ditamap", TransformServiceXsl.getSchemaVariant(new CmsItemPath("/doc/map.ditamap")));
-		assertEquals("ditabase", TransformServiceXsl.getSchemaVariant(new CmsItemPath("/doc/topic.dita")));
-		assertEquals("ditabase", TransformServiceXsl.getSchemaVariant(new CmsItemPath("/doc/topic.xml")));
-		assertEquals("ditabase", TransformServiceXsl.getSchemaVariant(new CmsItemPath("/doc/keydefmap.xml")));
+		assertEquals("ditamap", TransformSchemaValidation.getSchemaVariant(new CmsItemPath("/doc/map.ditamap")));
+		assertEquals("ditabase", TransformSchemaValidation.getSchemaVariant(new CmsItemPath("/doc/topic.dita")));
+		assertEquals("ditabase", TransformSchemaValidation.getSchemaVariant(new CmsItemPath("/doc/topic.xml")));
+		assertEquals("ditabase", TransformSchemaValidation.getSchemaVariant(new CmsItemPath("/doc/keydefmap.xml")));
 	}
 
 	@Test

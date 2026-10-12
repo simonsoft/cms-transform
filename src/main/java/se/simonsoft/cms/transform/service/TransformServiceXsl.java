@@ -19,7 +19,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
-import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
@@ -28,7 +27,6 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -38,12 +36,10 @@ import java.util.Optional;
 import java.util.Set;
 
 import javax.inject.Inject;
-import javax.inject.Provider;
 import javax.xml.transform.stream.StreamSource;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.xml.sax.SAXParseException;
 
 import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
@@ -79,8 +75,6 @@ import se.simonsoft.cms.xmlsource.transform.TransformOptions;
 import se.simonsoft.cms.xmlsource.transform.TransformStreamProvider;
 import se.simonsoft.cms.xmlsource.transform.TransformerService;
 import se.simonsoft.cms.xmlsource.transform.TransformerServiceFactory;
-import se.simonsoft.cms.xmlsource.validation.SchemaValidationError;
-import se.simonsoft.cms.xmlsource.validation.SchemaValidationException;
 
 public class TransformServiceXsl implements TransformService {
 	
@@ -107,8 +101,6 @@ public class TransformServiceXsl implements TransformService {
 	// Same name as the config option used by release and Fonto (ReleaseConfiguration in cms-release).
 	private static final String PARAM_SCHEMA_QUALIFIED_NAME = "SchemaQualifiedName";
 	private static final String PARAM_SCHEMA_VARIANT = "SchemaVariant";
-	static final String SCHEMA_VARIANT_DITABASE = "ditabase";
-	static final String SCHEMA_VARIANT_DITAMAP = "ditamap";
 
 	private static final int HTTP_URL_CONNECTION_READ_TIMEOUT = 60000;  	// 60 seconds
 	private static final int HTTP_URL_CONNECTION_CONNECT_TIMEOUT = 30000;  	// 30 seconds
@@ -170,7 +162,7 @@ public class TransformServiceXsl implements TransformService {
 			throw new IllegalArgumentException("Specified output must be an existing folder: " + outputPath.getPath());
 		}
 		
-		final boolean schemaValidate = isSchemaValidate(config.getOptions().getParams());
+		final TransformSchemaValidation schemaValidation = getSchemaValidation(config.getOptions().getParams(), baseItemId);
 		
 		CmsItem item = itemLookup.getItem(baseItemId);
 		
@@ -207,7 +199,7 @@ public class TransformServiceXsl implements TransformService {
 		final Set<CmsItemLock> locked = new HashSet<>();
 		try {
 			for (CmsItemId id: items) {
-				locked.addAll(transformItem(id, config, transformerService, transformOptions, patchset));
+				locked.addAll(transformItem(id, config, transformerService, transformOptions, patchset, schemaValidation));
 			}
 		} catch (RuntimeException e) {
 			logger.warn("Failed to transform / lock items: {}", e.getMessage(), e);
@@ -216,9 +208,9 @@ public class TransformServiceXsl implements TransformService {
 			throw e;
 		}
 		
-		if (schemaValidate) {
+		if (schemaValidation != null) {
 			try {
-				validateSchema(patchset, config.getOptions().getParams(), baseItemId);
+				schemaValidation.complete();
 			} catch (RuntimeException e) {
 				// Nothing is committed if any item fails validation.
 				unlockItemsFailure(locked);
@@ -302,7 +294,7 @@ public class TransformServiceXsl implements TransformService {
 		final boolean hasPathnamebase = pathnamebase != null && !pathnamebase.isEmpty();
 
 		final boolean isShardParent = CmsItemNameFactory.isShardParent(location);
-		final boolean schemaValidate = isSchemaValidate(config.getParams());
+		final TransformSchemaValidation schemaValidation = getSchemaValidation(config.getParams(), itemId);
 
 		if (isShardParent) {
 			if (hasPathnamebase) throw new IllegalArgumentException("The 'pathnamebase' is not allowed when the folder is a shardparent with a name pattern.");
@@ -325,9 +317,10 @@ public class TransformServiceXsl implements TransformService {
 			} else {
 				throw new IllegalArgumentException("Import requires either a valid URL or content.");
 			}
-			CmsItemLock lock = addToPatchset(patchset, relPath, stream, overwrite, properties, schemaValidate);
+			stream = validateSchema(schemaValidation, relPath, stream);
+			if (schemaValidation != null) schemaValidation.complete();
+			CmsItemLock lock = addToPatchset(patchset, relPath, stream, overwrite, properties);
 			if (lock != null) locked.add(lock);
-			if (schemaValidate) validateSchema(patchset, config.getParams(), itemId);
 			String comment = config.getParams().get("comment");
 			if (comment != null && !comment.trim().isEmpty()) patchset.setHistoryMessage(comment);
 			RepoRevision r = commit.run(patchset);
@@ -384,14 +377,13 @@ public class TransformServiceXsl implements TransformService {
 		return item.isCmsClass("tikahtml");
     }
 	
-	private Set<CmsItemLock> transformItem(CmsItemId baseItemId, TransformConfig config, TransformerService transformerService, TransformOptions transformOptions, CmsPatchset patchset) {
+	private Set<CmsItemLock> transformItem(CmsItemId baseItemId, TransformConfig config, TransformerService transformerService, TransformOptions transformOptions, CmsPatchset patchset, TransformSchemaValidation schemaValidation) {
 		
 		logger.debug("Transforming itemid: {}", baseItemId);
 		final CmsItemPropertiesMap props = getProperties(baseItemId, config);
 		// Output path can be null if explicitly set to empty string.
 		final CmsItemPath outputPath = getOutputPath(baseItemId, config.getOptions().getParams().get("output"));
 		final boolean overwrite = Boolean.valueOf(config.getOptions().getParams().get("overwrite"));
-		final boolean schemaValidate = isSchemaValidate(config.getOptions().getParams());
 		final Set<CmsItemLock> locked = new HashSet<>();
 		
 		SaxonOutputURIResolverXdm outputURIResolver = new SaxonOutputURIResolverXdm(sourceReader);
@@ -403,7 +395,8 @@ public class TransformServiceXsl implements TransformService {
 			// Detects empty stream and aborts them via EmptyStreamException, which is caught and logged as warning.
 			// Assume only non-principal output if the output path is explicitly set to repo root.
 			if (outputPath != null) {
-				CmsItemLock lock = addToPatchset(patchset, outputPath.append(baseItemId.getRelPath().getName()), baseStreamProvider.get(), overwrite, props, schemaValidate);
+				CmsItemPath path = outputPath.append(baseItemId.getRelPath().getName());
+				CmsItemLock lock = addToPatchset(patchset, path, validateSchema(schemaValidation, path, baseStreamProvider.get()), overwrite, props);
 				if (lock != null) locked.add(lock); // Added items are not locked.
 			} else {
 				// Discard the principal output.
@@ -429,7 +422,7 @@ public class TransformServiceXsl implements TransformService {
 				
 				XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(href);
 				TransformStreamProvider streamProvider = transformerOutput.getTransformStreamProvider(resultDocument, null);
-				CmsItemLock lock = addToPatchset(patchset, path, streamProvider.get(), overwrite, props, schemaValidate);
+				CmsItemLock lock = addToPatchset(patchset, path, validateSchema(schemaValidation, path, streamProvider.get()), overwrite, props);
 				if (lock != null) locked.add(lock);
 			}
 		} catch (RuntimeException e) {
@@ -502,18 +495,15 @@ public class TransformServiceXsl implements TransformService {
 		}
 	}
 
-	private CmsItemLock addToPatchset(CmsPatchset patchset, CmsItemPath relPath, InputStream stream, boolean overwrite, CmsItemPropertiesMap properties, boolean repeatable) {
+	private CmsItemLock addToPatchset(CmsPatchset patchset, CmsItemPath relPath, InputStream stream, boolean overwrite, CmsItemPropertiesMap properties) {
 		CmsItemLock lock = null;
 		try {
 			final InputStream inputStream = getInputStreamNotEmpty(stream);
-			// Schema validation reads the contents from the patchset before commit, requires repeatable reads.
-			// Transform output is already in memory (ByteArrayInputStream from TransformStreamProvider), buffering copies it.
-			final Provider<InputStream> contents = repeatable ? getContentsBuffered(inputStream) : () -> inputStream;
 			boolean pathExists = pathExists(patchset.getRepository(), relPath);
 			if (!pathExists) {
 				addFolderExists(patchset, relPath.getParent());
 				logger.debug("No file at path: '{}' will add new file.", relPath);
-				FileAdd fileAdd = new FileAdd(relPath, contents);
+				FileAdd fileAdd = new FileAdd(relPath, inputStream);
 				fileAdd.setPropertyChange(properties);
 				patchset.add(fileAdd);
 			} else if (overwrite){
@@ -525,7 +515,7 @@ public class TransformServiceXsl implements TransformService {
 				}
 				lock = locks.getSingle();
 				patchset.addLock(lock);
-				FileModificationLocked fileMod = new FileModificationLocked(relPath, contents);
+				FileModificationLocked fileMod = new FileModificationLocked(relPath, inputStream);
 				fileMod.setPropertyChange(properties);
 				patchset.add(fileMod);
 			} else {
@@ -614,87 +604,34 @@ public class TransformServiceXsl implements TransformService {
 		return pushbackInputStream;
 	}
 
-	private boolean emptyExceptDeclaration(String data) {
+	static boolean emptyExceptDeclaration(String data) {
 		return data.substring(data.indexOf("?>") + 2).trim().isEmpty();
 	}
 
-	private Provider<InputStream> getContentsBuffered(InputStream inputStream) throws IOException {
-		final byte[] bytes = inputStream.readAllBytes();
-		return () -> new ByteArrayInputStream(bytes);
-	}
-
 	/**
-	 * @return true if schema validation is requested, after verifying that it can be performed
+	 * @param contextItemId the schema is configured for the project of this item, unless given as a param
+	 * @return null if schema validation is not requested, after verifying that it can be performed
 	 */
-	private boolean isSchemaValidate(Map<String, String> params) {
+	private TransformSchemaValidation getSchemaValidation(Map<String, String> params, CmsItemId contextItemId) {
 		if (!Boolean.parseBoolean(params.get(PARAM_SCHEMA_VALIDATE))) {
-			return false;
+			return null;
 		}
 		if (this.schemaService == null) {
 			throw new IllegalStateException("Schema validation is requested (" + PARAM_SCHEMA_VALIDATE + ") but no schema service is configured.");
 		}
 		Optional<String> variant = getParamOptional(params, PARAM_SCHEMA_VARIANT);
-		if (variant.isPresent() && !variant.get().equals(SCHEMA_VARIANT_DITABASE) && !variant.get().equals(SCHEMA_VARIANT_DITAMAP)) {
+		if (variant.isPresent() && !variant.get().equals(TransformSchemaValidation.SCHEMA_VARIANT_DITABASE) && !variant.get().equals(TransformSchemaValidation.SCHEMA_VARIANT_DITAMAP)) {
 			throw new IllegalArgumentException("Unsupported " + PARAM_SCHEMA_VARIANT + ": " + variant.get());
 		}
-		return true;
+		return new TransformSchemaValidation(this.schemaService, contextItemId.getRepository(), getSchemaQualifiedName(params, contextItemId), variant);
 	}
 
 	/**
-	 * Validates all XML items in the patchset, all issues are logged before failing.
-	 * @param contextItemId the schema is configured for the project of this item, unless given as a param
-	 * @throws IllegalStateException if one or more items fail validation
+	 * Validates before the content is added to the patchset, see {@link TransformSchemaValidation#complete()}.
+	 * @return the content to add to the patchset
 	 */
-	private void validateSchema(CmsPatchset patchset, Map<String, String> params, CmsItemId contextItemId) {
-		final Optional<String> qname = getSchemaQualifiedName(params, contextItemId);
-		final Optional<String> variantParam = getParamOptional(params, PARAM_SCHEMA_VARIANT);
-		final CmsItemClassificationXml classification = new CmsItemClassificationXml();
-		int itemCount = 0;
-		int itemFailedCount = 0;
-		int issueCount = 0;
-
-		for (CmsPatchItem patchItem : patchset) {
-			final CmsItemPath path = patchItem.getPath();
-			if (!(patchItem instanceof CmsPatchItem.SupportsContent) || !classification.isXml(patchset.getRepository().getItemId().withRelPath(path))) {
-				continue;
-			}
-			final CmsPatchItem.SupportsContent item = (CmsPatchItem.SupportsContent) patchItem;
-			final String variant = variantParam.orElse(getSchemaVariant(path));
-			logger.debug("Schema validation of {} with schema {} {}", path, qname.orElse("(built-in)"), variant);
-			itemCount++;
-
-			List<SchemaValidationError> errors = validateSchemaItem(qname, variant, item);
-			if (!errors.isEmpty()) {
-				itemFailedCount++;
-				issueCount += errors.size();
-				for (SchemaValidationError error : errors) {
-					logger.warn("Schema validation {} in {} (line {}, column {}): {}", error.getLevel(), path, error.getLineNumber(), error.getColumnNumber(), error.getMessage());
-				}
-			}
-		}
-
-		if (itemFailedCount > 0) {
-			throw new IllegalStateException(String.format("Schema validation failed: %d of %d items, %d issues", itemFailedCount, itemCount, issueCount));
-		}
-		logger.info("Schema validation passed: {} items", itemCount);
-	}
-
-	private List<SchemaValidationError> validateSchemaItem(Optional<String> qname, String variant, CmsPatchItem.SupportsContent item) {
-		try (InputStream xml = item.getWorkingFile()) {
-			this.schemaService.validate(qname, variant, xml);
-			return Collections.emptyList();
-		} catch (SchemaValidationException e) {
-			return e.getErrors();
-		} catch (IOException e) {
-			throw new UncheckedIOException(e);
-		} catch (RuntimeException e) {
-			// Not well-formed XML is a fatal parse error, report it like the schema issues.
-			if (e.getCause() instanceof SAXParseException) {
-				SAXParseException cause = (SAXParseException) e.getCause();
-				return List.of(new SchemaValidationError(SchemaValidationError.Level.FATAL, cause.getMessage(), cause.getLineNumber(), cause.getColumnNumber()));
-			}
-			throw e;
-		}
+	private static InputStream validateSchema(TransformSchemaValidation schemaValidation, CmsItemPath path, InputStream content) {
+		return schemaValidation != null ? schemaValidation.validate(path, content) : content;
 	}
 
 	/**
@@ -717,16 +654,6 @@ public class TransformServiceXsl implements TransformService {
 		return Optional.empty();
 	}
 	
-	/**
-	 * @return ditamap for the file extension .ditamap, otherwise ditabase (like ReleaseSchema in cms-release)
-	 */
-	static String getSchemaVariant(CmsItemPath path) {
-		if (SCHEMA_VARIANT_DITAMAP.equals(path.getExtension())) {
-			return SCHEMA_VARIANT_DITAMAP;
-		}
-		return SCHEMA_VARIANT_DITABASE;
-	}
-
 	private Optional<String> getParamOptional(Map<String, String> params, String key) {
 		String value = params.get(key);
 		if (value == null || value.trim().isEmpty()) {
