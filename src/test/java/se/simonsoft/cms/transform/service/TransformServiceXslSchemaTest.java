@@ -168,6 +168,22 @@ public class TransformServiceXslSchemaTest {
 	}
 
 	@Test
+	public void testValidDoctypeNotLoaded() throws Exception {
+		long youngest = repoLookup.getYoungest(repo).getNumber();
+		Map<String, String> params = new HashMap<>();
+		params.put("SchemaValidate", "true");
+		params.put("doctype", "true"); // XSL param: map with DOCTYPE, the DTD does not exist.
+
+		// Validation must not try to load the DTD (cms-xmlsource 0.22.2).
+		transformService.transform(new CmsItemIdArg(transformTestDoc), getConfig(params));
+
+		assertEquals(youngest + 1, repoLookup.getYoungest(repo).getNumber());
+		String map = getContents(transformTestMap);
+		assertTrue(map, map.contains("<!DOCTYPE techdocmap"));
+		assertTrue(map, map.contains("missing.dtd"));
+	}
+
+	@Test
 	public void testInvalidNotValidatedWithoutSchemaValidate() throws Exception {
 		long youngest = repoLookup.getYoungest(repo).getNumber();
 		Map<String, String> params = new HashMap<>();

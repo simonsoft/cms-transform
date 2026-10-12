@@ -18,10 +18,12 @@
 -->
 <!-- Produces a topic (principal output) and a map (result document), optionally with schema issues. -->
 <xsl:stylesheet version="2.0"
-    xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+    xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+    xmlns:cms="http://www.simonsoft.se/namespace/cms">
     <xsl:output method="xml" indent="yes" />
 
     <xsl:param name="invalid" select="'false'"/>
+    <xsl:param name="doctype" select="'false'"/>
 
     <xsl:template match="@* | node()">
         <xsl:copy>
@@ -35,6 +37,11 @@
         </xsl:copy>
         <xsl:result-document href="transform-test-map.ditamap">
             <techdocmap>
+                <xsl:if test="$doctype = 'true'">
+                    <!-- DOCTYPE with a DTD that does not exist (see output.xsl). -->
+                    <xsl:attribute name="cms:doctype-public" select="'-//Simonsoft//DTD Missing//EN'"/>
+                    <xsl:attribute name="cms:doctype-system" select="'missing.dtd'"/>
+                </xsl:if>
                 <title><xsl:value-of select="title"/></title>
                 <xsl:for-each select="body/section">
                     <topicref href="{@name}"/>
