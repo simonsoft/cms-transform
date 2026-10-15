@@ -27,6 +27,7 @@ import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.command.CommandRuntimeException;
 import se.simonsoft.cms.item.command.ExternalCommandHandler;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
+import se.simonsoft.cms.transform.schema.TransformSchemaValidationException;
 import se.simonsoft.cms.transform.service.TransformService;
 
 public class TransformCommandHandler implements ExternalCommandHandler<TransformConfig> {
@@ -59,6 +60,10 @@ public class TransformCommandHandler implements ExternalCommandHandler<Transform
 		try {
 			transformService.transform(item, arguments);
 			logger.debug("Transformed with config: '{}'", arguments);
+		} catch (TransformSchemaValidationException e) {
+			// The issues are logged as warnings during validation.
+			logger.error("Transform failed '{}': {}", arguments, e.getMessage());
+			throw new CommandRuntimeException(TransformSchemaValidationException.ERROR_NAME, e.toJson(TransformSchemaValidationException.JSON_MAX_LENGTH));
 		} catch (Exception e) {
 			// TODO: Catch more specific exceptions in order to control whether retry is suitable.
 			logger.error("Transform failed '{}': {}", arguments, e.getMessage(), e);

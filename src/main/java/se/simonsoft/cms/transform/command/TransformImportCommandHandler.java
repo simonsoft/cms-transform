@@ -21,8 +21,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.simonsoft.cms.item.CmsItemId;
 import se.simonsoft.cms.item.CmsRepository;
+import se.simonsoft.cms.item.command.CommandRuntimeException;
 import se.simonsoft.cms.item.command.ExternalCommandHandler;
 import se.simonsoft.cms.transform.config.databind.TransformImportOptions;
+import se.simonsoft.cms.transform.schema.TransformSchemaValidationException;
 import se.simonsoft.cms.transform.service.TransformService;
 
 import java.util.Map;
@@ -48,6 +50,10 @@ public class TransformImportCommandHandler implements ExternalCommandHandler<Tra
             logger.info(successMessage);
             return successMessage;
             
+        } catch (TransformSchemaValidationException e) {
+            // The issues are logged as warnings during validation.
+            logger.error("Import failed for item: {} - {}", item.getLogicalId(), e.getMessage());
+            throw new CommandRuntimeException(TransformSchemaValidationException.ERROR_NAME, e.toJson(TransformSchemaValidationException.JSON_MAX_LENGTH));
         } catch (Exception e) {
             String errorMessage = "Import failed for item: " + item.getLogicalId() + " - " + e.getMessage();
             logger.error(errorMessage, e);
