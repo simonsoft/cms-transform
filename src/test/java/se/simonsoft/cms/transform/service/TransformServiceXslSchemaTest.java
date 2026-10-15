@@ -44,10 +44,13 @@ import se.simonsoft.cms.item.info.CmsRepositoryLookup;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.transform.config.databind.TransformConfigOptions;
 import se.simonsoft.cms.transform.config.databind.TransformImportOptions;
+import se.simonsoft.cms.transform.schema.TransformSchemaValidationException;
+import se.simonsoft.cms.transform.schema.TransformSchemaValidationIssue;
 import se.simonsoft.cms.transform.testconfig.TestFileXmlSetUp;
 import se.simonsoft.cms.transform.testconfig.TestTransformSchemaService;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceReaderS9api;
 import se.simonsoft.cms.xmlsource.transform.TransformerServiceFactory;
+import se.simonsoft.cms.xmlsource.validation.SchemaValidationError;
 
 public class TransformServiceXslSchemaTest {
 
@@ -160,9 +163,19 @@ public class TransformServiceXslSchemaTest {
 		try {
 			transformService.transform(new CmsItemIdArg(transformTestDoc), getConfig(params));
 			fail("Should fail schema validation");
-		} catch (IllegalStateException e) {
+		} catch (TransformSchemaValidationException e) {
 			// 3 x para in the topic, reltable in the map.
 			assertEquals("Schema validation failed: 2 of 2 items, 4 issues", e.getMessage());
+			assertEquals(2, e.getItemFailedCount());
+			assertEquals(4, e.getIssues().size());
+			// Issues of all items, with the path that would have been committed.
+			TransformSchemaValidationIssue first = e.getIssues().get(0);
+			assertEquals("/doc/transform-test.xml", first.getPath().getPath());
+			assertEquals(SchemaValidationError.Level.ERROR, first.getError().getLevel());
+			assertEquals(Integer.valueOf(33), first.getError().getLineNumber());
+			assertEquals(Integer.valueOf(16), first.getError().getColumnNumber());
+			assertTrue(first.getError().getMessage(), first.getError().getMessage().startsWith("element \"para\" not allowed anywhere"));
+			assertEquals("/doc/transform-test-map.ditamap", e.getIssues().get(3).getPath().getPath());
 		}
 		assertNotCommittedAndUnlocked(youngest);
 	}
@@ -204,7 +217,7 @@ public class TransformServiceXslSchemaTest {
 		try {
 			transformService.transform(new CmsItemIdArg(transformTestDoc), getConfig(params));
 			fail("Should fail schema validation");
-		} catch (IllegalStateException e) {
+		} catch (TransformSchemaValidationException e) {
 			assertEquals("Schema validation failed: 1 of 2 items, 1 issues", e.getMessage());
 		}
 		assertNotCommittedAndUnlocked(youngest);
@@ -236,7 +249,7 @@ public class TransformServiceXslSchemaTest {
 		try {
 			transformService.transform(new CmsItemIdArg(transformTestDocStrict), getConfig(params));
 			fail("Should fail schema validation");
-		} catch (IllegalStateException e) {
+		} catch (TransformSchemaValidationException e) {
 			assertEquals("Schema validation failed: 1 of 2 items, 1 issues", e.getMessage());
 		}
 		assertEquals("nothing committed", youngest, repoLookup.getYoungest(repo).getNumber());
@@ -266,7 +279,7 @@ public class TransformServiceXslSchemaTest {
 		try {
 			transformService.transform(new CmsItemIdArg(transformTestDoc), getConfig(params));
 			fail("Should fail schema validation");
-		} catch (IllegalStateException e) {
+		} catch (TransformSchemaValidationException e) {
 			assertTrue(e.getMessage(), e.getMessage().startsWith("Schema validation failed: 1 of 2 items, "));
 		}
 		assertNotCommittedAndUnlocked(youngest);
@@ -315,7 +328,7 @@ public class TransformServiceXslSchemaTest {
 		try {
 			transformService.importItem(folder, options);
 			fail("Should fail schema validation");
-		} catch (IllegalStateException e) {
+		} catch (TransformSchemaValidationException e) {
 			assertEquals("Schema validation failed: 1 of 1 items, 1 issues", e.getMessage());
 		}
 		assertEquals("nothing committed", youngest, repoLookup.getYoungest(repo).getNumber());

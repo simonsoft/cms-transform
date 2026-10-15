@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -33,6 +34,8 @@ import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.stream.ByteArrayInOutStream;
 import se.simonsoft.cms.item.structure.CmsItemClassificationXml;
 import se.simonsoft.cms.transform.schema.TransformSchemaService;
+import se.simonsoft.cms.transform.schema.TransformSchemaValidationException;
+import se.simonsoft.cms.transform.schema.TransformSchemaValidationIssue;
 import se.simonsoft.cms.xmlsource.validation.SchemaValidationError;
 import se.simonsoft.cms.xmlsource.validation.SchemaValidationException;
 
@@ -56,7 +59,7 @@ class TransformSchemaValidation {
 
 	private int itemCount = 0;
 	private int itemFailedCount = 0;
-	private int issueCount = 0;
+	private final List<TransformSchemaValidationIssue> issues = new ArrayList<>();
 
 	/**
 	 * @param qname schema application, empty for the built-in schema
@@ -96,8 +99,8 @@ class TransformSchemaValidation {
 		xml.reset(); // ByteArrayInputStream.close() has no effect.
 		if (!errors.isEmpty()) {
 			itemFailedCount++;
-			issueCount += errors.size();
 			for (SchemaValidationError error : errors) {
+				issues.add(new TransformSchemaValidationIssue(path, error));
 				logger.warn("Schema validation {} in {} (line {}, column {}): {}", error.getLevel(), path, error.getLineNumber(), error.getColumnNumber(), error.getMessage());
 			}
 		}
@@ -116,11 +119,11 @@ class TransformSchemaValidation {
 	}
 
 	/**
-	 * @throws IllegalStateException if one or more items failed validation
+	 * @throws TransformSchemaValidationException if one or more items failed validation
 	 */
 	void complete() {
 		if (itemFailedCount > 0) {
-			throw new IllegalStateException(String.format("Schema validation failed: %d of %d items, %d issues", itemFailedCount, itemCount, issueCount));
+			throw new TransformSchemaValidationException(itemCount, itemFailedCount, issues);
 		}
 		logger.info("Schema validation passed: {} items", itemCount);
 	}
