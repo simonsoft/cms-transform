@@ -32,6 +32,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import javax.inject.Inject;
@@ -54,6 +55,7 @@ import se.simonsoft.cms.item.commit.CmsPatchset;
 import se.simonsoft.cms.item.commit.FileAdd;
 import se.simonsoft.cms.item.commit.FileModificationLocked;
 import se.simonsoft.cms.item.commit.FolderExist;
+import se.simonsoft.cms.item.config.CmsResourceContext;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsItemNotFoundException;
@@ -65,6 +67,7 @@ import se.simonsoft.cms.reporting.CmsItemLookupReporting;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.transform.config.databind.TransformImportOptions;
 import se.simonsoft.cms.transform.lookup.CmsItemLookupTransform;
+import se.simonsoft.cms.transform.schema.TransformSchemaService;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceDocumentS9api;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceReaderS9api;
 import se.simonsoft.cms.xmlsource.transform.SaxonOutputURIResolverXdm;
@@ -83,6 +86,7 @@ public class TransformServiceXsl implements TransformService {
 	private final CmsRepositoryLookup repoLookup;
 	private final XmlSourceReaderS9api sourceReader;
 	private final CmsItemNameFactory itemNameFactory;
+	private final TransformSchemaService schemaService;
 	
 	private final TransformerService transformerOutput;
 	
@@ -91,6 +95,12 @@ public class TransformServiceXsl implements TransformService {
 	private static final String TRANSFORM_NAME_PROP_KEY = "abx:TransformName";
 	private static final int HISTORY_MSG_MAX_SIZE = 2000;
 	private static final String OUTPUT_TRANSFORM = "se/simonsoft/cms/transform/output.xsl";
+
+	// Schema validation params, CamelCase keys are not forwarded to the XSL.
+	private static final String PARAM_SCHEMA_VALIDATE = "SchemaValidate";
+	// Same name as the config option used by release and Fonto (ReleaseConfiguration in cms-release).
+	private static final String PARAM_SCHEMA_QUALIFIED_NAME = "SchemaQualifiedName";
+	private static final String PARAM_SCHEMA_VARIANT = "SchemaVariant";
 
 	private static final int HTTP_URL_CONNECTION_READ_TIMEOUT = 60000;  	// 60 seconds
 	private static final int HTTP_URL_CONNECTION_CONNECT_TIMEOUT = 30000;  	// 30 seconds
@@ -106,7 +116,8 @@ public class TransformServiceXsl implements TransformService {
 			CmsRepositoryLookup lookupRepo,
 			TransformerServiceFactory transfromerServiceFactory,
 			XmlSourceReaderS9api sourceReader,
-			CmsItemNameFactory itemNameFactory
+			CmsItemNameFactory itemNameFactory,
+			TransformSchemaService schemaService
 			) {
 		
 		this.commit = commit;
@@ -116,6 +127,7 @@ public class TransformServiceXsl implements TransformService {
 		this.transformerServiceFactory = transfromerServiceFactory;
 		this.sourceReader = sourceReader;
 		this.itemNameFactory = itemNameFactory;
+		this.schemaService = schemaService;
 		
 		this.transformerOutput = transfromerServiceFactory.buildTransformerService(new StreamSource(this.getClass().getClassLoader().getResourceAsStream(OUTPUT_TRANSFORM)));
 		this.itemLookupTransform = new CmsItemLookupTransform(itemLookup, itemLookupReporting);
@@ -149,6 +161,8 @@ public class TransformServiceXsl implements TransformService {
 		if (!pathExists(repository, outputPath)) {
 			throw new IllegalArgumentException("Specified output must be an existing folder: " + outputPath.getPath());
 		}
+		
+		final TransformSchemaValidation schemaValidation = getSchemaValidation(config.getOptions().getParams(), baseItemId);
 		
 		CmsItem item = itemLookup.getItem(baseItemId);
 		
@@ -185,13 +199,23 @@ public class TransformServiceXsl implements TransformService {
 		final Set<CmsItemLock> locked = new HashSet<>();
 		try {
 			for (CmsItemId id: items) {
-				locked.addAll(transformItem(id, config, transformerService, transformOptions, patchset));
+				locked.addAll(transformItem(id, config, transformerService, transformOptions, patchset, schemaValidation));
 			}
 		} catch (RuntimeException e) {
 			logger.warn("Failed to transform / lock items: {}", e.getMessage(), e);
 			// Release all locks taken by previous iterations of the loop.
 			unlockItemsFailure(locked);
 			throw e;
+		}
+		
+		if (schemaValidation != null) {
+			try {
+				schemaValidation.complete();
+			} catch (RuntimeException e) {
+				// Nothing is committed if any item fails validation.
+				unlockItemsFailure(locked);
+				throw e;
+			}
 		}
 		
 		List<String> messages = transformOptions.getMessageListener().getMessages();
@@ -270,6 +294,7 @@ public class TransformServiceXsl implements TransformService {
 		final boolean hasPathnamebase = pathnamebase != null && !pathnamebase.isEmpty();
 
 		final boolean isShardParent = CmsItemNameFactory.isShardParent(location);
+		final TransformSchemaValidation schemaValidation = getSchemaValidation(config.getParams(), itemId);
 
 		if (isShardParent) {
 			if (hasPathnamebase) throw new IllegalArgumentException("The 'pathnamebase' is not allowed when the folder is a shardparent with a name pattern.");
@@ -292,6 +317,8 @@ public class TransformServiceXsl implements TransformService {
 			} else {
 				throw new IllegalArgumentException("Import requires either a valid URL or content.");
 			}
+			stream = validateSchema(schemaValidation, relPath, stream);
+			if (schemaValidation != null) schemaValidation.complete();
 			CmsItemLock lock = addToPatchset(patchset, relPath, stream, overwrite, properties);
 			if (lock != null) locked.add(lock);
 			String comment = config.getParams().get("comment");
@@ -350,7 +377,7 @@ public class TransformServiceXsl implements TransformService {
 		return item.isCmsClass("tikahtml");
     }
 	
-	private Set<CmsItemLock> transformItem(CmsItemId baseItemId, TransformConfig config, TransformerService transformerService, TransformOptions transformOptions, CmsPatchset patchset) {
+	private Set<CmsItemLock> transformItem(CmsItemId baseItemId, TransformConfig config, TransformerService transformerService, TransformOptions transformOptions, CmsPatchset patchset, TransformSchemaValidation schemaValidation) {
 		
 		logger.debug("Transforming itemid: {}", baseItemId);
 		final CmsItemPropertiesMap props = getProperties(baseItemId, config);
@@ -368,7 +395,9 @@ public class TransformServiceXsl implements TransformService {
 			// Detects empty stream and aborts them via EmptyStreamException, which is caught and logged as warning.
 			// Assume only non-principal output if the output path is explicitly set to repo root.
 			if (outputPath != null) {
-				locked.add(addToPatchset(patchset, outputPath.append(baseItemId.getRelPath().getName()), baseStreamProvider.get(), overwrite, props));
+				CmsItemPath path = outputPath.append(baseItemId.getRelPath().getName());
+				CmsItemLock lock = addToPatchset(patchset, path, validateSchema(schemaValidation, path, baseStreamProvider.get()), overwrite, props);
+				if (lock != null) locked.add(lock); // Added items are not locked.
 			} else {
 				// Discard the principal output.
 				baseStreamProvider.get();
@@ -393,7 +422,8 @@ public class TransformServiceXsl implements TransformService {
 				
 				XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(href);
 				TransformStreamProvider streamProvider = transformerOutput.getTransformStreamProvider(resultDocument, null);
-				locked.add(addToPatchset(patchset, path, streamProvider.get(), overwrite, props));
+				CmsItemLock lock = addToPatchset(patchset, path, validateSchema(schemaValidation, path, streamProvider.get()), overwrite, props);
+				if (lock != null) locked.add(lock);
 			}
 		} catch (RuntimeException e) {
 			// Unlock locks taken in this invocation of transformItem.
@@ -574,10 +604,64 @@ public class TransformServiceXsl implements TransformService {
 		return pushbackInputStream;
 	}
 
-	private boolean emptyExceptDeclaration(String data) {
+	static boolean emptyExceptDeclaration(String data) {
 		return data.substring(data.indexOf("?>") + 2).trim().isEmpty();
 	}
+
+	/**
+	 * @param contextItemId the schema is configured for the project of this item, unless given as a param
+	 * @return null if schema validation is not requested, after verifying that it can be performed
+	 */
+	private TransformSchemaValidation getSchemaValidation(Map<String, String> params, CmsItemId contextItemId) {
+		if (!Boolean.parseBoolean(params.get(PARAM_SCHEMA_VALIDATE))) {
+			return null;
+		}
+		if (this.schemaService == null) {
+			throw new IllegalStateException("Schema validation is requested (" + PARAM_SCHEMA_VALIDATE + ") but no schema service is configured.");
+		}
+		Optional<String> variant = getParamOptional(params, PARAM_SCHEMA_VARIANT);
+		if (variant.isPresent() && !variant.get().equals(TransformSchemaValidation.SCHEMA_VARIANT_DITABASE) && !variant.get().equals(TransformSchemaValidation.SCHEMA_VARIANT_DITAMAP)) {
+			throw new IllegalArgumentException("Unsupported " + PARAM_SCHEMA_VARIANT + ": " + variant.get());
+		}
+		return new TransformSchemaValidation(this.schemaService, contextItemId.getRepository(), getSchemaQualifiedName(params, contextItemId), variant);
+	}
+
+	/**
+	 * Validates before the content is added to the patchset, see {@link TransformSchemaValidation#complete()}.
+	 * @return the content to add to the patchset
+	 */
+	private static InputStream validateSchema(TransformSchemaValidation schemaValidation, CmsItemPath path, InputStream content) {
+		return schemaValidation != null ? schemaValidation.validate(path, content) : content;
+	}
+
+	/**
+	 * @return the param if given, otherwise the config option at project level (like ReleaseConfiguration in cms-release), empty for the built-in schema
+	 */
+	private Optional<String> getSchemaQualifiedName(Map<String, String> params, CmsItemId contextItemId) {
+		Optional<String> param = getParamOptional(params, PARAM_SCHEMA_QUALIFIED_NAME);
+		if (param.isPresent()) {
+			return param;
+		}
+		// Project level is the first folder.
+		CmsItemPath projectPath = contextItemId.getRelPath();
+		while (projectPath != null && projectPath.getSize() > 1) {
+			projectPath = projectPath.getParent();
+		}
+		CmsResourceContext context = repoLookup.getConfig(contextItemId.getRepository().getItemId(projectPath, null), CmsItemKind.Folder);
+		if (context.hasConfigOption(PARAM_SCHEMA_QUALIFIED_NAME)) {
+			return Optional.of(context.getConfigOption(PARAM_SCHEMA_QUALIFIED_NAME).getValueString());
+		}
+		return Optional.empty();
+	}
 	
+	private Optional<String> getParamOptional(Map<String, String> params, String key) {
+		String value = params.get(key);
+		if (value == null || value.trim().isEmpty()) {
+			return Optional.empty();
+		}
+		return Optional.of(value.trim());
+	}
+
 	private CmsItemPropertiesMap getProperties(CmsItemId baseId, TransformConfig config) {
 		
 		CmsItemPropertiesMap m = new CmsItemPropertiesMap();
