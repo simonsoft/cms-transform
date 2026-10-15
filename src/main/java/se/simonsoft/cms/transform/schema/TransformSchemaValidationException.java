@@ -19,8 +19,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
@@ -39,8 +40,6 @@ public class TransformSchemaValidationException extends RuntimeException {
 	 * Step Functions limits the task failure cause to 32768 characters.
 	 */
 	public static final int JSON_MAX_LENGTH = 32000;
-
-	private static final ObjectMapper mapper = new ObjectMapper();
 
 	private final int itemCount;
 	private final int itemFailedCount;
@@ -78,8 +77,8 @@ public class TransformSchemaValidationException extends RuntimeException {
 	 * The issues that fit within maxLength (UTF-8 bytes), the remaining are counted in 'issuesOmitted'.
 	 * @return JSON with the message, counts and issues (path, level, line, column, message)
 	 */
-	public String toJson(int maxLength) {
-		ObjectNode result = mapper.createObjectNode();
+	public String toJson(ObjectWriter writer, int maxLength) {
+		ObjectNode result = JsonNodeFactory.instance.objectNode();
 		result.put("message", getMessage());
 		result.put("itemCount", itemCount);
 		result.put("itemFailedCount", itemFailedCount);
@@ -87,15 +86,15 @@ public class TransformSchemaValidationException extends RuntimeException {
 		ArrayNode array = result.putArray("issues");
 		result.put("issuesOmitted", issues.size()); // At least as long as the final value.
 
-		int length = getLength(result);
+		int length = getLength(writer, result);
 		for (TransformSchemaValidationIssue issue : issues) {
-			ObjectNode node = mapper.createObjectNode();
+			ObjectNode node = JsonNodeFactory.instance.objectNode();
 			node.put("path", issue.getPath().getPath());
 			node.put("level", issue.getError().getLevel().name());
 			node.put("line", issue.getError().getLineNumber());
 			node.put("column", issue.getError().getColumnNumber());
 			node.put("message", issue.getError().getMessage());
-			int nodeLength = getLength(node) + 1; // Separator.
+			int nodeLength = getLength(writer, node) + 1; // Separator.
 			if (length + nodeLength > maxLength) {
 				break;
 			}
@@ -103,16 +102,16 @@ public class TransformSchemaValidationException extends RuntimeException {
 			length += nodeLength;
 		}
 		result.put("issuesOmitted", issues.size() - array.size());
-		return toString(result);
+		return toString(writer, result);
 	}
 
-	private static int getLength(ObjectNode node) {
-		return toString(node).getBytes(StandardCharsets.UTF_8).length;
+	private static int getLength(ObjectWriter writer, ObjectNode node) {
+		return toString(writer, node).getBytes(StandardCharsets.UTF_8).length;
 	}
 
-	private static String toString(ObjectNode node) {
+	private static String toString(ObjectWriter writer, ObjectNode node) {
 		try {
-			return mapper.writeValueAsString(node);
+			return writer.writeValueAsString(node);
 		} catch (JsonProcessingException e) {
 			throw new IllegalStateException("Failed to serialize schema validation issues.", e);
 		}

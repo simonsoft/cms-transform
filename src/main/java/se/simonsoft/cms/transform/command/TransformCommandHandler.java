@@ -22,6 +22,8 @@ import javax.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.databind.ObjectWriter;
+
 import se.simonsoft.cms.item.CmsItemId;
 import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.command.CommandRuntimeException;
@@ -35,10 +37,12 @@ public class TransformCommandHandler implements ExternalCommandHandler<Transform
 	private final Logger logger = LoggerFactory.getLogger(TransformCommandHandler.class);
 	
 	private final Map<CmsRepository, TransformService> transformServiceMap;
+	private final ObjectWriter writer;
 	
 	@Inject
-	public TransformCommandHandler(Map<CmsRepository, TransformService> transformServiceMap) {
+	public TransformCommandHandler(Map<CmsRepository, TransformService> transformServiceMap, ObjectWriter writer) {
 		this.transformServiceMap = transformServiceMap;
+		this.writer = writer;
 	}
 	
 	@Override
@@ -63,7 +67,7 @@ public class TransformCommandHandler implements ExternalCommandHandler<Transform
 		} catch (TransformSchemaValidationException e) {
 			// The issues are logged as warnings during validation.
 			logger.error("Transform failed '{}': {}", arguments, e.getMessage());
-			throw new CommandRuntimeException(TransformSchemaValidationException.ERROR_NAME, e.toJson(TransformSchemaValidationException.JSON_MAX_LENGTH));
+			throw new CommandRuntimeException(TransformSchemaValidationException.ERROR_NAME, e.toJson(writer, TransformSchemaValidationException.JSON_MAX_LENGTH));
 		} catch (Exception e) {
 			// TODO: Catch more specific exceptions in order to control whether retry is suitable.
 			logger.error("Transform failed '{}': {}", arguments, e.getMessage(), e);

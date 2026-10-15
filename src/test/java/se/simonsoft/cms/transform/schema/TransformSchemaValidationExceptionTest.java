@@ -49,7 +49,7 @@ public class TransformSchemaValidationExceptionTest {
 		TransformSchemaValidationException e = getException(2);
 		assertEquals("Schema validation failed: 1 of 1 items, 2 issues", e.getMessage());
 
-		JsonNode json = mapper.readTree(e.toJson(TransformSchemaValidationException.JSON_MAX_LENGTH));
+		JsonNode json = mapper.readTree(e.toJson(mapper.writer(), TransformSchemaValidationException.JSON_MAX_LENGTH));
 		assertEquals("Schema validation failed: 1 of 1 items, 2 issues", json.get("message").asText());
 		assertEquals(1, json.get("itemCount").asInt());
 		assertEquals(1, json.get("itemFailedCount").asInt());
@@ -68,7 +68,7 @@ public class TransformSchemaValidationExceptionTest {
 	public void testToJsonOmitted() throws Exception {
 		TransformSchemaValidationException e = getException(1000);
 
-		String result = e.toJson(TransformSchemaValidationException.JSON_MAX_LENGTH);
+		String result = e.toJson(mapper.writer(), TransformSchemaValidationException.JSON_MAX_LENGTH);
 		int length = result.getBytes(StandardCharsets.UTF_8).length;
 		// Filled with issues (each less than 1000 bytes) up to the max length.
 		assertTrue("length " + length, length <= TransformSchemaValidationException.JSON_MAX_LENGTH && length > TransformSchemaValidationException.JSON_MAX_LENGTH - 1000);
@@ -83,7 +83,7 @@ public class TransformSchemaValidationExceptionTest {
 	public void testToJsonNoIssueFits() throws Exception {
 		TransformSchemaValidationException e = getException(2);
 
-		JsonNode json = mapper.readTree(e.toJson(200));
+		JsonNode json = mapper.readTree(e.toJson(mapper.writer(), 200));
 		assertEquals(0, json.get("issues").size());
 		assertEquals(2, json.get("issuesOmitted").asInt());
 	}

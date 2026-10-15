@@ -81,7 +81,7 @@ public class TransformCommandHandlerSchemaTest {
 
 	@Test
 	public void testTransform() throws Exception {
-		TransformCommandHandler handler = new TransformCommandHandler(Map.of(itemId.getRepository(), transformServiceInvalid));
+		TransformCommandHandler handler = new TransformCommandHandler(Map.of(itemId.getRepository(), transformServiceInvalid), mapper.writer());
 		TransformConfig config = new TransformConfig();
 		TransformConfigOptions options = new TransformConfigOptions();
 		options.setType("xsl");
@@ -92,7 +92,7 @@ public class TransformCommandHandlerSchemaTest {
 
 	@Test
 	public void testImport() throws Exception {
-		TransformImportCommandHandler handler = new TransformImportCommandHandler(Map.of(itemId.getRepository(), transformServiceInvalid));
+		TransformImportCommandHandler handler = new TransformImportCommandHandler(Map.of(itemId.getRepository(), transformServiceInvalid), mapper.writer());
 
 		assertFailure(assertThrows(CommandRuntimeException.class, () -> handler.handleExternalCommand(itemId, new TransformImportOptions())));
 	}
