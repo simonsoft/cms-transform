@@ -174,6 +174,7 @@ public class TransformServiceXslSchemaTest {
 			assertEquals(SchemaValidationError.Level.ERROR, first.getError().getLevel());
 			assertEquals(Integer.valueOf(33), first.getError().getLineNumber());
 			assertEquals(Integer.valueOf(16), first.getError().getColumnNumber());
+			assertEquals("/document[1]/body[1]/section[1]/para[1]", first.getError().getElementPath());
 			assertTrue(first.getError().getMessage(), first.getError().getMessage().startsWith("element \"para\" not allowed anywhere"));
 			assertEquals("/doc/transform-test-map.ditamap", e.getIssues().get(3).getPath().getPath());
 		}
