@@ -29,7 +29,7 @@ public interface TransformService {
 	Set<CmsItemId> importItem(CmsItemId itemId, TransformImportOptions config);
 
 	/**
-	 * @param item
+	 * @param itemId
 	 * @param config
 	 * @return the folder CmsItem where validation was performed
 	 */

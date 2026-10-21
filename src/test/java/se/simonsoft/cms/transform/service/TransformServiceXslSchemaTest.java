@@ -15,9 +15,9 @@
  */
 package se.simonsoft.cms.transform.service;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -25,69 +25,40 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import io.quarkus.test.junit.QuarkusTest;
+import se.simonsoft.cms.transform.testconfig.SvnDatasetTest;
 
 import net.sf.saxon.s9api.Processor;
-import se.repos.testing.indexing.ReposTestIndexing;
-import se.simonsoft.cms.backend.filexml.FilexmlCommit;
-import se.simonsoft.cms.backend.filexml.FilexmlSourceClasspath;
+import jakarta.inject.Inject;
 import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
 import se.simonsoft.cms.item.CmsItemPath;
-import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
-import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsItemNotFoundException;
-import se.simonsoft.cms.item.info.CmsRepositoryLookup;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.transform.config.databind.TransformConfigOptions;
 import se.simonsoft.cms.transform.config.databind.TransformImportOptions;
 import se.simonsoft.cms.transform.schema.TransformSchemaValidationException;
 import se.simonsoft.cms.transform.schema.TransformSchemaValidationIssue;
-import se.simonsoft.cms.transform.testconfig.TestFileXmlSetUp;
 import se.simonsoft.cms.transform.testconfig.TestTransformSchemaService;
-import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceReaderS9api;
-import se.simonsoft.cms.xmlsource.transform.TransformerServiceFactory;
 import se.simonsoft.cms.xmlsource.validation.SchemaValidationError;
 
-public class TransformServiceXslSchemaTest {
+@QuarkusTest
+public class TransformServiceXslSchemaTest extends SvnDatasetTest {
 
-	private ReposTestIndexing indexing;
-	private TestFileXmlSetUp testSetUp;
-	private CmsRepository repo;
-	private CmsItemLookup lookup;
-	private CmsRepositoryLookup repoLookup;
-	private FilexmlCommit commit;
-	private TransformerServiceFactory transformerServiceFactory;
-	private XmlSourceReaderS9api sourceReader;
-
+	@Inject Processor processor;
 	private TransformService transformService;
 
 	private static final String transformTestDoc = "x-svn:///svn/repo1/doc/transform-test.xml";
 	private static final String transformTestMap = "x-svn:///svn/repo1/doc/transform-test-map.ditamap";
 	private static final String transformTestDocStrict = "x-svn:///svn/repo1/strict/transform-test.xml";
 
-	@Before
-	public void setup() throws Exception {
-		testSetUp = new TestFileXmlSetUp(new CmsRepository("http://cmshostname:123/svn/repo1"),
-				new FilexmlSourceClasspath("se/simonsoft/cms/transform/datasets/repo1"));
-		repo = testSetUp.getRepo();
-		commit = testSetUp.getCommit();
-		indexing = testSetUp.getIndexing();
-		lookup = indexing.getContext().getInstance(CmsItemLookup.class);
-		repoLookup = indexing.getContext().getInstance(CmsRepositoryLookup.class);
-		transformerServiceFactory = indexing.getContext().getInstance(TransformerServiceFactory.class);
-		sourceReader = indexing.getContext().getInstance(XmlSourceReaderS9api.class);
-		Processor processor = indexing.getContext().getInstance(Processor.class);
-
-		transformService = new TransformServiceXsl(commit, lookup, null, repoLookup, transformerServiceFactory, sourceReader, null, new TestTransformSchemaService(processor));
-	}
-
-	@After
-	public void tearDown() {
-		indexing.tearDown();
+	@BeforeEach
+	public void setup() {
+		transformService = new TransformServiceXsl(commit, lookup, lookupReporting, repoLookup,
+				transformerServiceFactory, sourceReader, nameFactory, new TestTransformSchemaService(processor));
 	}
 
 	private TransformConfig getConfig(Map<String, String> params) {
@@ -119,7 +90,7 @@ public class TransformServiceXslSchemaTest {
 	 * Asserts that nothing was committed and that the lock on the base item was released.
 	 */
 	private void assertNotCommittedAndUnlocked(long youngest) throws Exception {
-		assertEquals("nothing committed", youngest, repoLookup.getYoungest(repo).getNumber());
+		assertEquals(youngest, repoLookup.getYoungest(repo).getNumber(), "nothing committed");
 		try {
 			lookup.getItem(new CmsItemIdArg(transformTestMap));
 			fail("map should not be committed");
@@ -175,7 +146,7 @@ public class TransformServiceXslSchemaTest {
 			assertEquals(Integer.valueOf(33), first.getError().getLineNumber());
 			assertEquals(Integer.valueOf(16), first.getError().getColumnNumber());
 			assertEquals("/document[1]/body[1]/section[1]/para[1]", first.getError().getElementPath());
-			assertTrue(first.getError().getMessage(), first.getError().getMessage().startsWith("element \"para\" not allowed anywhere"));
+			assertTrue(first.getError().getMessage().startsWith("element \"para\" not allowed anywhere"), first.getError().getMessage());
 			assertEquals("/doc/transform-test-map.ditamap", e.getIssues().get(3).getPath().getPath());
 		}
 		assertNotCommittedAndUnlocked(youngest);
@@ -193,8 +164,8 @@ public class TransformServiceXslSchemaTest {
 
 		assertEquals(youngest + 1, repoLookup.getYoungest(repo).getNumber());
 		String map = getContents(transformTestMap);
-		assertTrue(map, map.contains("<!DOCTYPE techdocmap"));
-		assertTrue(map, map.contains("missing.dtd"));
+		assertTrue(map.contains("<!DOCTYPE techdocmap"), map);
+		assertTrue(map.contains("missing.dtd"), map);
 	}
 
 	@Test
@@ -253,7 +224,7 @@ public class TransformServiceXslSchemaTest {
 		} catch (TransformSchemaValidationException e) {
 			assertEquals("Schema validation failed: 1 of 2 items, 1 issues", e.getMessage());
 		}
-		assertEquals("nothing committed", youngest, repoLookup.getYoungest(repo).getNumber());
+		assertEquals(youngest, repoLookup.getYoungest(repo).getNumber(), "nothing committed");
 	}
 
 	@Test
@@ -281,7 +252,7 @@ public class TransformServiceXslSchemaTest {
 			transformService.transform(new CmsItemIdArg(transformTestDoc), getConfig(params));
 			fail("Should fail schema validation");
 		} catch (TransformSchemaValidationException e) {
-			assertTrue(e.getMessage(), e.getMessage().startsWith("Schema validation failed: 1 of 2 items, "));
+			assertTrue(e.getMessage().startsWith("Schema validation failed: 1 of 2 items, "), e.getMessage());
 		}
 		assertNotCommittedAndUnlocked(youngest);
 	}
@@ -302,7 +273,8 @@ public class TransformServiceXslSchemaTest {
 
 	@Test
 	public void testSchemaServiceNotConfigured() throws Exception {
-		TransformService transformServiceNoSchema = new TransformServiceXsl(commit, lookup, null, repoLookup, transformerServiceFactory, sourceReader, null, null);
+		TransformService transformServiceNoSchema = new TransformServiceXsl(commit, lookup, lookupReporting, repoLookup,
+				transformerServiceFactory, sourceReader, nameFactory, null);
 		Map<String, String> params = new HashMap<>();
 		params.put("SchemaValidate", "true");
 
@@ -332,7 +304,7 @@ public class TransformServiceXslSchemaTest {
 		} catch (TransformSchemaValidationException e) {
 			assertEquals("Schema validation failed: 1 of 1 items, 1 issues", e.getMessage());
 		}
-		assertEquals("nothing committed", youngest, repoLookup.getYoungest(repo).getNumber());
+		assertEquals(youngest, repoLookup.getYoungest(repo).getNumber(), "nothing committed");
 
 		options.setContent("<techdocmap><title>Imported</title></techdocmap>");
 		Set<CmsItemId> result = transformService.importItem(folder, options);

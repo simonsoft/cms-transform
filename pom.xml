@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<artifactId>cms-transform</artifactId>
-	<version>0.5.2-SNAPSHOT</version>
+	<version>0.40.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
 	<name>${project.artifactId}-${project.version}</name>
@@ -24,75 +24,116 @@
 		</repository>
 	</repositories>
 
+	<properties>
+		<compiler-plugin.version>3.14.0</compiler-plugin.version>
+		<maven.compiler.source>21</maven.compiler.source>
+		<maven.compiler.target>21</maven.compiler.target>
+		<mockito-version>5.21.0</mockito-version>
+		<quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
+		<quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
+		<quarkus.platform.version>3.39.2</quarkus.platform.version>
+		<solr-version>9.6.1</solr-version>
+		<surefire-plugin.version>3.5.4</surefire-plugin.version>
+	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>${quarkus.platform.group-id}</groupId>
+				<artifactId>${quarkus.platform.artifact-id}</artifactId>
+				<version>${quarkus.platform.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
 	<dependencies>
-		<!-- logging backend for unit tests: log debug and above to console, no need for config file -->
-		
+		<dependency>
+			<groupId>jakarta.inject</groupId>
+			<artifactId>jakarta.inject-api</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>jakarta.ws.rs</groupId>
+			<artifactId>jakarta.ws.rs-api</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>se.simonsoft</groupId>
+			<artifactId>cms-item</artifactId>
+			<version>3.2.4-SNAPSHOT</version>
+		</dependency>
 		<dependency>
 			<groupId>se.simonsoft</groupId>
 			<artifactId>cms-xmlsource</artifactId>
 			<version>0.40.0-SNAPSHOT</version>
 		</dependency>
-		
 		<dependency>
-		    <groupId>se.simonsoft</groupId>
-		    <artifactId>cms-reporting</artifactId>
-		    <version>2.3.1</version>
+			<groupId>se.simonsoft</groupId>
+			<artifactId>cms-reporting</artifactId>
+			<version>2.3.2-SNAPSHOT</version>
 		</dependency>
-		
-
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
 			<artifactId>jackson-databind</artifactId>
-			<version>${jackson-version}</version>
 		</dependency>
-		
 		<dependency>
-			<groupId>ch.qos.logback</groupId>
-			<artifactId>logback-classic</artifactId>
-			<version>${logback-version}</version>
+			<groupId>io.quarkus</groupId>
+			<artifactId>quarkus-junit</artifactId>
 			<scope>test</scope>
 		</dependency>
-
+		<dependency>
+			<groupId>org.junit.vintage</groupId>
+			<artifactId>junit-vintage-engine</artifactId>
+			<scope>test</scope>
+		</dependency>
 		<dependency>
 			<groupId>se.simonsoft</groupId>
-			<artifactId>cms-backend-filexml</artifactId>
-			<version>0.22.0-SNAPSHOT</version>
+			<artifactId>quarkus-svn-extension</artifactId>
+			<version>1.0.0-SNAPSHOT</version>
 			<scope>test</scope>
 		</dependency>
-		
-		
 		<dependency>
-			<groupId>org.sonatype.sisu</groupId>
-			<artifactId>sisu-guice</artifactId>
-			<version>3.1.3</version>
-			<scope>test</scope>		
+			<groupId>se.simonsoft</groupId>
+			<artifactId>quarkus-solr-extension</artifactId>
+			<version>1.0.0-SNAPSHOT</version>
+			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>org.sonatype.sisu.inject</groupId>
-			<artifactId>guice-multibindings</artifactId>
-			<version>3.1.3</version>
-			<scope>test</scope>		
+			<groupId>se.simonsoft</groupId>
+			<artifactId>cms-backend-svnkit</artifactId>
+			<version>4.0.0-SNAPSHOT</version>
+			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>org.sonatype.sisu.inject</groupId>
-			<artifactId>guice-grapher</artifactId>
-			<version>3.1.3</version>
-			<scope>test</scope>		
+			<groupId>se.simonsoft</groupId>
+			<artifactId>cms-reporting-solrj</artifactId>
+			<version>2.3.0</version>
+			<scope>test</scope>
 		</dependency>
-
+		<dependency>
+			<groupId>org.apache.solr</groupId>
+			<artifactId>solr-solrj</artifactId>
+			<version>${solr-version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>se.repos</groupId>
+			<artifactId>repos-indexing</artifactId>
+			<version>0.40.0-SNAPSHOT</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 	
 	<build>
 		<plugins>
 			<plugin>
-				<!-- Needed for Java 17 compatibility. -->
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>${surefire-plugin.version}</version>
 				<configuration>
-					<argLine>
-						--add-opens java.base/java.lang=ALL-UNNAMED
-					</argLine>
+					<systemPropertyVariables>
+						<java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+					</systemPropertyVariables>
 				</configuration>
 			</plugin>
 		</plugins>	
