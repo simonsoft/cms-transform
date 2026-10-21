@@ -39,7 +39,7 @@ public class TransformSchemaValidationExceptionTest {
 		for (int i = 0; i < issueCount; i++) {
 			// Jing messages list the expected elements, often several hundred characters.
 			String message = "element \"para\" not allowed anywhere; expected element " + "\"p\", ".repeat(100) + "or \"ul\"";
-			issues.add(new TransformSchemaValidationIssue(new CmsItemPath("/dita/xml/topics/Topic " + (i / 10) + " åäö.dita"), new SchemaValidationError(SchemaValidationError.Level.ERROR, message, i + 1, 9)));
+			issues.add(new TransformSchemaValidationIssue(new CmsItemPath("/dita/xml/topics/Topic " + (i / 10) + " åäö.dita"), new SchemaValidationError(SchemaValidationError.Level.ERROR, message, i + 1, 9, "/topic[1]/body[1]/para[" + (i + 1) + "]")));
 		}
 		return new TransformSchemaValidationException(issueCount / 10 + 1, issueCount / 10 + 1, issues);
 	}
@@ -61,6 +61,7 @@ public class TransformSchemaValidationExceptionTest {
 		assertEquals("ERROR", issue.get("level").asText());
 		assertEquals(2, issue.get("line").asInt());
 		assertEquals(9, issue.get("column").asInt());
+		assertEquals("/topic[1]/body[1]/para[2]", issue.get("element").asText());
 		assertTrue(issue.get("message").asText().startsWith("element \"para\" not allowed anywhere"));
 	}
 

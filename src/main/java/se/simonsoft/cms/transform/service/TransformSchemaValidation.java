@@ -101,7 +101,7 @@ class TransformSchemaValidation {
 			itemFailedCount++;
 			for (SchemaValidationError error : errors) {
 				issues.add(new TransformSchemaValidationIssue(path, error));
-				logger.warn("Schema validation {} in {} (line {}, column {}): {}", error.getLevel(), path, error.getLineNumber(), error.getColumnNumber(), error.getMessage());
+				logger.warn("Schema validation {} in {} (line {}, column {}) at {}: {}", error.getLevel(), path, error.getLineNumber(), error.getColumnNumber(), error.getElementPath(), error.getMessage());
 			}
 		}
 		return xml;
