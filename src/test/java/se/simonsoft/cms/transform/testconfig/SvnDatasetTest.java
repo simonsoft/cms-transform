@@ -15,7 +15,6 @@
  */
 package se.simonsoft.cms.transform.testconfig;
 
-import io.quarkus.test.junit.QuarkusMock;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Provider;
@@ -23,7 +22,6 @@ import org.apache.solr.client.solrj.SolrClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.tmatesoft.svn.core.io.SVNRepository;
-import se.simonsoft.cms.backend.svnkit.config.CmsRepositoryName;
 import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.RepoRevision;
 import se.simonsoft.cms.item.commit.CmsCommit;
@@ -50,7 +48,6 @@ public abstract class SvnDatasetTest {
 
 	@BeforeEach
 	public void loadDataset() throws Exception {
-		QuarkusMock.installMockForType(new CmsRepositoryName("repo1"), CmsRepositoryName.class);
 		svn.get().getLatestRevision(); // Resolve the session and load the unchanged repository.xml fixture.
 	}
 

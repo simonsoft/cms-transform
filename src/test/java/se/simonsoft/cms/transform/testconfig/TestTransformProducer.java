@@ -17,10 +17,10 @@ package se.simonsoft.cms.transform.testconfig;
 
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import io.smallrye.common.annotation.Identifier;
 import jakarta.enterprise.context.RequestScoped;
 import jakarta.enterprise.inject.Produces;
@@ -32,6 +32,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.indexing.IdStrategy;
 import se.simonsoft.cms.item.info.CmsItemLookup;
+import se.simonsoft.cms.item.info.CmsRepositoryLookup;
 import se.simonsoft.cms.reporting.ReportingConfiguration;
 import se.simonsoft.cms.reporting.SearchCore;
 import se.simonsoft.cms.reporting.solrj.SearchCoreRepositemSolrj;
@@ -43,7 +44,8 @@ import se.simonsoft.cms.xmlsource.transform.function.GetChecksum;
 import se.simonsoft.cms.xmlsource.transform.function.GetLogicalId;
 import se.simonsoft.cms.xmlsource.transform.function.GetPegRev;
 import se.simonsoft.cms.xmlsource.transform.function.WithPegRev;
-import se.simonsoft.svn.runtime.RepoId;
+import se.simonsoft.cms.transform.schema.TransformSchemaService;
+import se.simonsoft.cms.transform.service.TransformService;
 
 /** Application-owned dependencies, as supplied by webapp, using the real SVN/Solr services. */
 public class TestTransformProducer {
@@ -67,6 +69,26 @@ public class TestTransformProducer {
 		return new ObjectMapper().reader();
 	}
 
+	@Produces @Singleton
+	ObjectWriter objectWriter() {
+		return new ObjectMapper().writer();
+	}
+
+	@Produces @RequestScoped
+	TransformSchemaService schemas(Processor processor) {
+		return new TestTransformSchemaService(processor);
+	}
+
+	@Produces @Singleton @Named("global") @Identifier("global")
+	CmsRepositoryLookup globalLookup(CmsRepositoryLookup lookup) {
+		return lookup;
+	}
+
+	@Produces @RequestScoped
+	Map<CmsRepository, TransformService> transforms(CmsRepository repository, TransformService service) {
+		return Map.of(repository, service);
+	}
+
 	@Produces @Singleton @Named("config:se.simonsoft.cms.hostname")
 	String hostname(@ConfigProperty(name = "cms.hostname") String hostname) {
 		return hostname;
@@ -82,23 +104,13 @@ public class TestTransformProducer {
 		return new SearchCoreRepositemSolrj(client, idStrategy);
 	}
 
-	@Produces @Singleton
-	Map<CmsRepository, CmsItemLookup> lookups(CmsItemLookup lookup) {
-		return Map.of(new CmsRepository("https://cmshostname/svn/repo1"), lookup);
+	@Produces @RequestScoped
+	Map<CmsRepository, CmsItemLookup> lookups(CmsRepository repository, CmsItemLookup lookup) {
+		return Map.of(repository, lookup);
 	}
 
-	@Produces @Singleton
-	Map<CmsRepository, ReportingConfiguration> reportingConfigurations(ReportingConfiguration config) {
-		return Map.of(new CmsRepository("https://cmshostname/svn/repo1"), config);
-	}
-}
-
-@RequestScoped
-class DatasetRepoIdProducer {
-	private final String repoId = "test-" + UUID.randomUUID();
-
-	@Produces @RepoId
-	String repoId() {
-		return repoId;
+	@Produces @RequestScoped
+	Map<CmsRepository, ReportingConfiguration> reportingConfigurations(CmsRepository repository, ReportingConfiguration config) {
+		return Map.of(repository, config);
 	}
 }

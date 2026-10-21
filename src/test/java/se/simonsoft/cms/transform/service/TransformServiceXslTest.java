@@ -27,11 +27,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.tmatesoft.svn.core.SVNPropertyValue;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.arc.ClientProxy;
 import se.simonsoft.cms.transform.testconfig.SvnDatasetTest;
 
 import se.simonsoft.cms.item.CmsItem;
@@ -52,15 +52,10 @@ import se.simonsoft.cms.transform.config.databind.TransformConfigOptions;
 public class TransformServiceXslTest extends SvnDatasetTest {
 
 	@Inject IdStrategy ids;
-	private TransformService transformService;
+	@Inject TransformService transformService;
 
 	static final String transformTestDoc = "x-svn:///svn/repo1/doc/transform-test.xml";
 
-	@BeforeEach
-	public void setup() {
-		transformService = new TransformServiceXsl(commit, lookup, lookupReporting, repoLookup,
-				transformerServiceFactory, sourceReader, nameFactory, null);
-	}
 
 	@Test
 	public void testSingleOutputFolderDoNotExist() throws Exception {
@@ -199,7 +194,7 @@ public class TransformServiceXslTest extends SvnDatasetTest {
 		revprops.put("cms:Move", "true");
 		revprops.put("abx:Test", "value");
 
-		((TransformServiceXsl) transformService).applyRevisionProperties(patchset, revprops);
+		((TransformServiceXsl) ClientProxy.unwrap(transformService)).applyRevisionProperties(patchset, revprops);
 
 		assertEquals("true", patchset.getRevisionProperties().getString("cms:Move"));
 		assertEquals("value", patchset.getRevisionProperties().getString("abx:Test"));
@@ -209,7 +204,7 @@ public class TransformServiceXslTest extends SvnDatasetTest {
 	public void testApplyRevisionPropertiesNullIsNoop() {
 		CmsPatchset patchset = new CmsPatchset(repo, repoLookup.getYoungest(repo));
 
-		((TransformServiceXsl) transformService).applyRevisionProperties(patchset, null);
+		((TransformServiceXsl) ClientProxy.unwrap(transformService)).applyRevisionProperties(patchset, null);
 
 		assertTrue(patchset.getRevisionProperties().getKeySet().isEmpty());
 	}
@@ -221,7 +216,7 @@ public class TransformServiceXslTest extends SvnDatasetTest {
 		revprops.put("InvalidKeyNoColon", "value");
 
 		try {
-			((TransformServiceXsl) transformService).applyRevisionProperties(patchset, revprops);
+			((TransformServiceXsl) ClientProxy.unwrap(transformService)).applyRevisionProperties(patchset, revprops);
 			fail("Should fail, revprop key must have the form 'prefix:name'.");
 		} catch (IllegalArgumentException e) {
 			assertEquals("Invalid revprop key: 'InvalidKeyNoColon'. Must have the form 'prefix:name' (exactly one colon), e.g. 'cms:Move'.", e.getMessage());
@@ -236,7 +231,7 @@ public class TransformServiceXslTest extends SvnDatasetTest {
 		revprops.put(":name", "value");
 
 		try {
-			((TransformServiceXsl) transformService).applyRevisionProperties(patchset, revprops);
+			((TransformServiceXsl) ClientProxy.unwrap(transformService)).applyRevisionProperties(patchset, revprops);
 			fail("Should fail, revprop key must have a non-empty prefix.");
 		} catch (IllegalArgumentException e) {
 			assertEquals("Invalid revprop key: ':name'. Must have the form 'prefix:name' (exactly one colon), e.g. 'cms:Move'.", e.getMessage());

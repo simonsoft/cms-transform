@@ -25,12 +25,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import io.quarkus.test.junit.QuarkusTest;
 import se.simonsoft.cms.transform.testconfig.SvnDatasetTest;
 
-import net.sf.saxon.s9api.Processor;
 import jakarta.inject.Inject;
 import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
@@ -42,24 +40,17 @@ import se.simonsoft.cms.transform.config.databind.TransformConfigOptions;
 import se.simonsoft.cms.transform.config.databind.TransformImportOptions;
 import se.simonsoft.cms.transform.schema.TransformSchemaValidationException;
 import se.simonsoft.cms.transform.schema.TransformSchemaValidationIssue;
-import se.simonsoft.cms.transform.testconfig.TestTransformSchemaService;
 import se.simonsoft.cms.xmlsource.validation.SchemaValidationError;
 
 @QuarkusTest
 public class TransformServiceXslSchemaTest extends SvnDatasetTest {
 
-	@Inject Processor processor;
-	private TransformService transformService;
+	@Inject TransformService transformService;
 
 	private static final String transformTestDoc = "x-svn:///svn/repo1/doc/transform-test.xml";
 	private static final String transformTestMap = "x-svn:///svn/repo1/doc/transform-test-map.ditamap";
 	private static final String transformTestDocStrict = "x-svn:///svn/repo1/strict/transform-test.xml";
 
-	@BeforeEach
-	public void setup() {
-		transformService = new TransformServiceXsl(commit, lookup, lookupReporting, repoLookup,
-				transformerServiceFactory, sourceReader, nameFactory, new TestTransformSchemaService(processor));
-	}
 
 	private TransformConfig getConfig(Map<String, String> params) {
 		Map<String, String> optionsParams = new HashMap<String, String>();

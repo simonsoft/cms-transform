@@ -33,7 +33,8 @@ import se.simonsoft.cms.transform.testconfig.SvnDatasetTest;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.inject.Inject;
+import io.quarkus.arc.ClientProxy;
 
 import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
@@ -44,14 +45,13 @@ import se.simonsoft.cms.item.workflow.WorkflowExecutionException;
 import se.simonsoft.cms.item.workflow.WorkflowExecutor;
 import se.simonsoft.cms.item.workflow.WorkflowItemInput;
 import se.simonsoft.cms.transform.config.TransformConfiguration;
-import se.simonsoft.cms.transform.config.TransformConfigurationDefault;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 
 @QuarkusTest
 public class TransformItemChangedEventListenerTest extends SvnDatasetTest {
 	
 
-	private TransformConfiguration transformConfig;
+	@Inject TransformConfiguration transformConfig;
 	private Map<CmsRepository, CmsItemLookup> lookups;
 	private String userId = null;
 
@@ -59,14 +59,13 @@ public class TransformItemChangedEventListenerTest extends SvnDatasetTest {
 
 	@BeforeEach
 	public void setup() {
-		transformConfig = new TransformConfigurationDefault(repoLookup, new ObjectMapper().reader());
 		lookups = Map.of(repo, lookup);
 	}
 
 	@Test
 	public void testEventListenerGetsConfigs() throws WorkflowExecutionException {
 		
-		TransformConfiguration spyTransformConfig = spy(transformConfig);
+		TransformConfiguration spyTransformConfig = spy(ClientProxy.unwrap(transformConfig));
 		WorkflowExecutor<WorkflowItemInput> spyWfExec = spy(WorkflowExecutor.class);
 		
 		
@@ -95,7 +94,7 @@ public class TransformItemChangedEventListenerTest extends SvnDatasetTest {
 	@Test
 	public void testFailsIfNoPegrev() {
 		
-		TransformConfiguration spyTransformConfig = spy(transformConfig);
+		TransformConfiguration spyTransformConfig = spy(ClientProxy.unwrap(transformConfig));
 		WorkflowExecutor<WorkflowItemInput> spyWfExec = spy(WorkflowExecutor.class);
 
 		
@@ -114,7 +113,7 @@ public class TransformItemChangedEventListenerTest extends SvnDatasetTest {
 	
 	@Test
 	public void testFolderInputNoTransform() throws WorkflowExecutionException {
-		TransformConfiguration spyTransformConfig = spy(transformConfig);
+		TransformConfiguration spyTransformConfig = spy(ClientProxy.unwrap(transformConfig));
 		WorkflowExecutor<WorkflowItemInput> spyWfExec = spy(WorkflowExecutor.class);
 		
 		CmsItemId itemIdFolder = new CmsItemIdArg("x-svn:///svn/repo1/doc").withPegRev(1L);
@@ -131,7 +130,7 @@ public class TransformItemChangedEventListenerTest extends SvnDatasetTest {
 	public void testItemNotWithinWhitelist() throws WorkflowExecutionException {
 		//Repository config white lists /doc and /transformed/single
 		
-		TransformConfiguration spyTransformConfig = spy(transformConfig);
+		TransformConfiguration spyTransformConfig = spy(ClientProxy.unwrap(transformConfig));
 		WorkflowExecutor<WorkflowItemInput> spyWfExec = spy(WorkflowExecutor.class);
 		
 		CmsItemId itemIdFolder = new CmsItemIdArg("x-svn:///svn/repo1/transformed/multiple/existing/section1.xml").withPegRev(1L);
