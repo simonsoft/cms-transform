@@ -15,6 +15,7 @@
  */
 package se.simonsoft.cms.transform.service;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -29,6 +30,7 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.tmatesoft.svn.core.SVNPropertyValue;
 import io.quarkus.test.junit.QuarkusTest;
 import se.simonsoft.cms.transform.testconfig.SvnDatasetTest;
 
@@ -244,6 +246,9 @@ public class TransformServiceXslTest extends SvnDatasetTest {
 	@Test
 	public void testRevisionPropertiesInvalidKeyAbortsTransformBeforeCommit() throws Exception {
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
+		long revisionBefore = repoLookup.getYoungest(repo).getNumber();
+		ByteArrayOutputStream original = new ByteArrayOutputStream();
+		lookup.getItem(itemId).getContents(original);
 
 		TransformConfig config = new TransformConfig();
 		config.setActive(true);
@@ -269,6 +274,25 @@ public class TransformServiceXslTest extends SvnDatasetTest {
 		} catch (IllegalArgumentException e) {
 			assertEquals("Invalid revprop key: 'InvalidKeyNoColon'. Must have the form 'prefix:name' (exactly one colon), e.g. 'cms:Move'.", e.getMessage());
 		}
+		assertEquals(revisionBefore, repoLookup.getYoungest(repo).getNumber());
+		ByteArrayOutputStream unchanged = new ByteArrayOutputStream();
+		lookup.getItem(itemId).getContents(unchanged);
+		assertArrayEquals(original.toByteArray(), unchanged.toByteArray());
+		assertNull(lookup.getLocked(itemId), "Rejected revision properties must not leave the output locked.");
+
+		// Correcting the configuration must allow the same service to transform the item.
+		revprops.clear();
+		revprops.put("cms:Move", "true");
+		transformService.transform(itemId, config);
+
+		assertEquals(revisionBefore + 1, repoLookup.getYoungest(repo).getNumber());
+		CmsItem transformed = lookup.getItem(itemId);
+		ByteArrayOutputStream output = new ByteArrayOutputStream();
+		transformed.getContents(output);
+		assertTrue(output.toString(StandardCharsets.UTF_8.name()).contains("single-output=\"true\""));
+		assertEquals("true", SVNPropertyValue.getPropertyAsString(
+				svn.get().getRevisionPropertyValue(revisionBefore + 1, "cms:Move")));
+		assertNull(lookup.getLocked(itemId));
 	}
 
 	@Test
