@@ -20,7 +20,7 @@
 		<repository>
 			<id>repos.open.repo</id>
 			<name>Simonsoft / Repos Open Repository</name>
-			<url>http://opensource.simonsoft.se/maven/</url>
+			<url>https://opensource.simonsoft.se/maven/</url>
 		</repository>
 	</repositories>
 
