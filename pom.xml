@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<artifactId>cms-transform</artifactId>
-	<version>0.40.0-SNAPSHOT</version>
+	<version>${revision}</version>
 	<packaging>jar</packaging>
 
 	<name>${project.artifactId}-${project.version}</name>
@@ -12,7 +12,7 @@
 	<parent>
 		<groupId>se.simonsoft</groupId>
 		<artifactId>cms-maven-parent</artifactId>
-		<version>11.0.4</version>
+		<version>21.0-SNAPSHOT</version>
 		<relativePath/>
 	</parent>
 
@@ -25,15 +25,10 @@
 	</repositories>
 
 	<properties>
-		<compiler-plugin.version>3.14.0</compiler-plugin.version>
-		<maven.compiler.source>21</maven.compiler.source>
-		<maven.compiler.target>21</maven.compiler.target>
-		<mockito-version>5.21.0</mockito-version>
+		<revision>0.40-SNAPSHOT</revision>
 		<quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
 		<quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-		<quarkus.platform.version>3.39.2</quarkus.platform.version>
 		<solr-version>9.6.1</solr-version>
-		<surefire-plugin.version>3.5.4</surefire-plugin.version>
 	</properties>
 
 	<dependencyManagement>
@@ -64,17 +59,17 @@
 		<dependency>
 			<groupId>se.simonsoft</groupId>
 			<artifactId>cms-item</artifactId>
-			<version>3.2.4-SNAPSHOT</version>
+			<version>3.2-PR71-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>se.simonsoft</groupId>
 			<artifactId>cms-xmlsource</artifactId>
-			<version>0.40.0-SNAPSHOT</version>
+			<version>0.40-PR16-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>se.simonsoft</groupId>
 			<artifactId>cms-reporting</artifactId>
-			<version>2.3.2-SNAPSHOT</version>
+			<version>2.3-PR15-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
@@ -86,6 +81,17 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<version>4.13.2</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-core</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
 			<groupId>org.junit.vintage</groupId>
 			<artifactId>junit-vintage-engine</artifactId>
 			<scope>test</scope>
@@ -93,25 +99,25 @@
 		<dependency>
 			<groupId>se.simonsoft</groupId>
 			<artifactId>quarkus-svn-extension</artifactId>
-			<version>1.0.0-SNAPSHOT</version>
+			<version>1.0-PR12-SNAPSHOT</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>se.simonsoft</groupId>
 			<artifactId>quarkus-solr-extension</artifactId>
-			<version>1.0.0-SNAPSHOT</version>
+			<version>1.0-PR3-SNAPSHOT</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>se.simonsoft</groupId>
 			<artifactId>cms-backend-svnkit</artifactId>
-			<version>4.0.0-SNAPSHOT</version>
+			<version>4.0-PR11-SNAPSHOT</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>se.simonsoft</groupId>
 			<artifactId>cms-reporting-solrj</artifactId>
-			<version>2.3.1-SNAPSHOT</version>
+			<version>2.3-PR4-SNAPSHOT</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
@@ -123,7 +129,7 @@
 		<dependency>
 			<groupId>se.repos</groupId>
 			<artifactId>repos-indexing</artifactId>
-			<version>0.40.0-SNAPSHOT</version>
+			<version>0.40-PR2-SNAPSHOT</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
@@ -133,7 +139,6 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
-				<version>${surefire-plugin.version}</version>
 				<configuration>
 					<systemPropertyVariables>
 						<java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
