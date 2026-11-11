@@ -15,87 +15,57 @@
  */
 package se.simonsoft.cms.transform.event;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import io.quarkus.test.junit.QuarkusTest;
+import se.simonsoft.cms.transform.testconfig.SvnDatasetTest;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.inject.Inject;
+import io.quarkus.arc.ClientProxy;
 
-import se.repos.testing.indexing.ReposTestIndexing;
-import se.simonsoft.cms.backend.filexml.FilexmlSourceClasspath;
 import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
 import se.simonsoft.cms.item.CmsRepository;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
-import se.simonsoft.cms.item.info.CmsRepositoryLookup;
 import se.simonsoft.cms.item.workflow.WorkflowExecutionException;
 import se.simonsoft.cms.item.workflow.WorkflowExecutor;
 import se.simonsoft.cms.item.workflow.WorkflowItemInput;
 import se.simonsoft.cms.transform.config.TransformConfiguration;
-import se.simonsoft.cms.transform.config.TransformConfigurationDefault;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
-import se.simonsoft.cms.transform.testconfig.TestFileXmlSetUp;
 
-public class TransformItemChangedEventListenerTest {
+@QuarkusTest
+public class TransformItemChangedEventListenerTest extends SvnDatasetTest {
 	
-	private static ReposTestIndexing indexing = null;
 
-	private static CmsItemLookup lookup;
-
-	static final String hostname = "cmshostname:123"; //Port number has at times been a source of confusion when there are multiple issues at play.
-
-	static CmsRepository repo;
-
-	private static TestFileXmlSetUp testSetUp;
-
-	private static CmsRepositoryLookup repoLookup;
-	private static TransformConfiguration transformConfig;
-	private Map<CmsRepository, CmsItemLookup> lookups = new HashMap<>();
+	@Inject TransformConfiguration transformConfig;
+	private Map<CmsRepository, CmsItemLookup> lookups;
 	private String userId = null;
-
-	static Long startRev = new Long(1); // Defined as youngest in the filexml repo.
 
 	static final String transformTestDoc = "x-svn:///svn/repo1/doc/transform-test.xml";
 
-
-	@Before
-	public void setup() throws Exception {
-		testSetUp = new TestFileXmlSetUp(new CmsRepository("http://" + hostname + "/svn/repo1"),
-				new FilexmlSourceClasspath("se/simonsoft/cms/transform/datasets/repo1"));
-		repo = testSetUp.getRepo();
-		indexing = testSetUp.getIndexing();
-		lookup = indexing.getContext().getInstance(CmsItemLookup.class);
-		repoLookup = indexing.getContext().getInstance(CmsRepositoryLookup.class);
-		transformConfig = new TransformConfigurationDefault(repoLookup, new ObjectMapper().reader());
-		
-		lookups.put(repo, lookup);
+	@BeforeEach
+	public void setup() {
+		lookups = Map.of(repo, lookup);
 	}
 
-	@After
-	public void tearDown() {
-		indexing.tearDown();
-	}
-	
-	
 	@Test
 	public void testEventListenerGetsConfigs() throws WorkflowExecutionException {
 		
-		TransformConfiguration spyTransformConfig = spy(transformConfig);
+		TransformConfiguration spyTransformConfig = spy(ClientProxy.unwrap(transformConfig));
 		WorkflowExecutor<WorkflowItemInput> spyWfExec = spy(WorkflowExecutor.class);
 		
 		
@@ -124,7 +94,7 @@ public class TransformItemChangedEventListenerTest {
 	@Test
 	public void testFailsIfNoPegrev() {
 		
-		TransformConfiguration spyTransformConfig = spy(transformConfig);
+		TransformConfiguration spyTransformConfig = spy(ClientProxy.unwrap(transformConfig));
 		WorkflowExecutor<WorkflowItemInput> spyWfExec = spy(WorkflowExecutor.class);
 
 		
@@ -143,7 +113,7 @@ public class TransformItemChangedEventListenerTest {
 	
 	@Test
 	public void testFolderInputNoTransform() throws WorkflowExecutionException {
-		TransformConfiguration spyTransformConfig = spy(transformConfig);
+		TransformConfiguration spyTransformConfig = spy(ClientProxy.unwrap(transformConfig));
 		WorkflowExecutor<WorkflowItemInput> spyWfExec = spy(WorkflowExecutor.class);
 		
 		CmsItemId itemIdFolder = new CmsItemIdArg("x-svn:///svn/repo1/doc").withPegRev(1L);
@@ -160,7 +130,7 @@ public class TransformItemChangedEventListenerTest {
 	public void testItemNotWithinWhitelist() throws WorkflowExecutionException {
 		//Repository config white lists /doc and /transformed/single
 		
-		TransformConfiguration spyTransformConfig = spy(transformConfig);
+		TransformConfiguration spyTransformConfig = spy(ClientProxy.unwrap(transformConfig));
 		WorkflowExecutor<WorkflowItemInput> spyWfExec = spy(WorkflowExecutor.class);
 		
 		CmsItemId itemIdFolder = new CmsItemIdArg("x-svn:///svn/repo1/transformed/multiple/existing/section1.xml").withPegRev(1L);

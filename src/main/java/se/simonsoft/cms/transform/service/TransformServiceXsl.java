@@ -35,7 +35,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import javax.xml.transform.stream.StreamSource;
 
 import org.slf4j.Logger;
@@ -172,6 +172,8 @@ public class TransformServiceXsl implements TransformService {
 		transformerService.setItemLookup(itemLookupTransform);
 		
 		final CmsPatchset patchset = new CmsPatchset(repository, baseRevision);
+		// Reject invalid revision properties before transformation acquires SVN locks.
+		applyRevisionProperties(patchset, config.getOptions().getRevprops());
 		TransformOptions transformOptions = new TransformOptions();
 		// Custom parameters, same convention as ReleaseExportOptions: a params entry whose key is all
 		// lowercase (optionally with digits/hyphens) is forwarded to the XSL transform as a stylesheet
@@ -223,8 +225,6 @@ public class TransformServiceXsl implements TransformService {
 		if (completeMessage != null && !completeMessage.trim().isEmpty()) {
 			patchset.setHistoryMessage(completeMessage);
 		}
-
-		applyRevisionProperties(patchset, config.getOptions().getRevprops());
 
 		RepoRevision r = commit.run(patchset);
 		logger.debug("Transform complete, commited with rev: {}", r.getNumber());
