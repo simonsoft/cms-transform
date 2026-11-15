@@ -16,12 +16,14 @@
 package se.simonsoft.cms.transform.service;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -151,6 +153,37 @@ public class TransformServiceXslSchemaTest {
 		assertEquals(youngest + 1, repoLookup.getYoungest(repo).getNumber());
 		assertTrue(getContents(transformTestMap).contains("<techdocmap>"));
 		assertTrue(getContents(transformTestDoc).contains("<subtitle>"));
+	}
+
+	@Test
+	public void testDryRunValidNotCommitted() throws Exception {
+		long youngest = repoLookup.getYoungest(repo).getNumber();
+		Map<String, String> params = new HashMap<>();
+		params.put("SchemaValidate", "true");
+		params.put("DryRun", "true");
+
+		TransformResult result = transformService.transform(new CmsItemIdArg(transformTestDoc), getConfig(params));
+
+		assertTrue(result.isDryRun());
+		assertEquals(List.of(new CmsItemPath("/doc/transform-test.xml")), result.getModified());
+		assertEquals(List.of(new CmsItemPath("/doc/transform-test-map.ditamap")), result.getAdded());
+		assertTrue(result.getLocked().isEmpty());
+		assertNotCommittedAndUnlocked(youngest);
+	}
+
+	@Test
+	public void testDryRunInvalidFails() throws Exception {
+		long youngest = repoLookup.getYoungest(repo).getNumber();
+		Map<String, String> params = new HashMap<>();
+		params.put("SchemaValidate", "true");
+		params.put("DryRun", "true");
+		params.put("invalid", "true"); // XSL param
+
+		// Same failure as without DryRun.
+		TransformSchemaValidationException e = assertThrows(TransformSchemaValidationException.class,
+				() -> transformService.transform(new CmsItemIdArg(transformTestDoc), getConfig(params)));
+		assertEquals("Schema validation failed: 2 of 2 items, 4 issues", e.getMessage());
+		assertNotCommittedAndUnlocked(youngest);
 	}
 
 	@Test

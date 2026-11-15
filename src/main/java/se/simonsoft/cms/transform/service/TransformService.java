@@ -24,7 +24,10 @@ import java.util.Set;
 
 public interface TransformService {
 	
-	void transform(CmsItemId item, TransformConfig config);
+	/**
+	 * @return the transformed items, nothing is committed if the param DryRun is true
+	 */
+	TransformResult transform(CmsItemId item, TransformConfig config);
 
 	Set<CmsItemId> importItem(CmsItemId itemId, TransformImportOptions config);
 

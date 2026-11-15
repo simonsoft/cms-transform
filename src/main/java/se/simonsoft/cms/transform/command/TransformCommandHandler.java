@@ -30,6 +30,7 @@ import se.simonsoft.cms.item.command.CommandRuntimeException;
 import se.simonsoft.cms.item.command.ExternalCommandHandler;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.transform.schema.TransformSchemaValidationException;
+import se.simonsoft.cms.transform.service.TransformResult;
 import se.simonsoft.cms.transform.service.TransformService;
 
 public class TransformCommandHandler implements ExternalCommandHandler<TransformConfig> {
@@ -61,8 +62,9 @@ public class TransformCommandHandler implements ExternalCommandHandler<Transform
 		}
 		
 		TransformService transformService = this.transformServiceMap.get(item.getRepository());
+		final TransformResult result;
 		try {
-			transformService.transform(item, arguments);
+			result = transformService.transform(item, arguments);
 			logger.debug("Transformed with config: '{}'", arguments);
 		} catch (TransformSchemaValidationException e) {
 			// The issues are logged as warnings during validation.
@@ -72,6 +74,10 @@ public class TransformCommandHandler implements ExternalCommandHandler<Transform
 			// TODO: Catch more specific exceptions in order to control whether retry is suitable.
 			logger.error("Transform failed '{}': {}", arguments, e.getMessage(), e);
 			throw new CommandRuntimeException("TransformFailed", e.getMessage());
+		}
+		if (result != null && result.isDryRun()) {
+			// The items and existing locks, e.g. the Step Functions task output.
+			return result.toJson(writer, TransformResult.JSON_MAX_LENGTH);
 		}
 		return null; // Must return JSON. Consider defining a return type instead of String.
 	}

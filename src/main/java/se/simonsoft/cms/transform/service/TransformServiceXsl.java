@@ -101,6 +101,8 @@ public class TransformServiceXsl implements TransformService {
 	// Same name as the config option used by release and Fonto (ReleaseConfiguration in cms-release).
 	private static final String PARAM_SCHEMA_QUALIFIED_NAME = "SchemaQualifiedName";
 	private static final String PARAM_SCHEMA_VARIANT = "SchemaVariant";
+	// Transform and validate without locking or committing, report the existing locks instead.
+	private static final String PARAM_DRY_RUN = "DryRun";
 
 	private static final int HTTP_URL_CONNECTION_READ_TIMEOUT = 60000;  	// 60 seconds
 	private static final int HTTP_URL_CONNECTION_CONNECT_TIMEOUT = 30000;  	// 30 seconds
@@ -134,7 +136,7 @@ public class TransformServiceXsl implements TransformService {
 	}
 
 	@Override
-	public void transform(CmsItemId itemId, TransformConfig config) {
+	public TransformResult transform(CmsItemId itemId, TransformConfig config) {
 		if (config == null || config.getOptions() == null) {
 			throw new IllegalArgumentException("TransformServiceXsl needs a valid TransformConfig object.");
 		}
@@ -163,6 +165,11 @@ public class TransformServiceXsl implements TransformService {
 		}
 		
 		final TransformSchemaValidation schemaValidation = getSchemaValidation(config.getOptions().getParams(), baseItemId);
+		final boolean dryRun = Boolean.parseBoolean(config.getOptions().getParams().get(PARAM_DRY_RUN));
+		final TransformResult result = new TransformResult(dryRun, baseRevision);
+		if (dryRun) {
+			logger.info("Transform dry run, nothing will be locked or committed: {}", baseItemId);
+		}
 		
 		CmsItem item = itemLookup.getItem(baseItemId);
 		
@@ -199,7 +206,7 @@ public class TransformServiceXsl implements TransformService {
 		final Set<CmsItemLock> locked = new HashSet<>();
 		try {
 			for (CmsItemId id: items) {
-				locked.addAll(transformItem(id, config, transformerService, transformOptions, patchset, schemaValidation));
+				locked.addAll(transformItem(id, config, transformerService, transformOptions, patchset, schemaValidation, result));
 			}
 		} catch (RuntimeException e) {
 			logger.warn("Failed to transform / lock items: {}", e.getMessage(), e);
@@ -226,8 +233,19 @@ public class TransformServiceXsl implements TransformService {
 
 		applyRevisionProperties(patchset, config.getOptions().getRevprops());
 
+		if (dryRun) {
+			if (result.getLocked().isEmpty()) {
+				logger.info("{} (base revision {})", result.getMessage(), baseRevision.getNumber());
+			} else {
+				logger.warn("{} (base revision {}), the transform would fail on the locked items: {}", result.getMessage(), baseRevision.getNumber(), result.getLocked().keySet());
+			}
+			return result;
+		}
+
 		RepoRevision r = commit.run(patchset);
+		result.setRevision(r);
 		logger.debug("Transform complete, commited with rev: {}", r.getNumber());
+		return result;
 	}
 
 	@Override
@@ -319,7 +337,7 @@ public class TransformServiceXsl implements TransformService {
 			}
 			stream = validateSchema(schemaValidation, relPath, stream);
 			if (schemaValidation != null) schemaValidation.complete();
-			CmsItemLock lock = addToPatchset(patchset, relPath, stream, overwrite, properties);
+			CmsItemLock lock = addToPatchset(patchset, relPath, stream, overwrite, properties, new TransformResult(false, baseRevision));
 			if (lock != null) locked.add(lock);
 			String comment = config.getParams().get("comment");
 			if (comment != null && !comment.trim().isEmpty()) patchset.setHistoryMessage(comment);
@@ -377,7 +395,7 @@ public class TransformServiceXsl implements TransformService {
 		return item.isCmsClass("tikahtml");
     }
 	
-	private Set<CmsItemLock> transformItem(CmsItemId baseItemId, TransformConfig config, TransformerService transformerService, TransformOptions transformOptions, CmsPatchset patchset, TransformSchemaValidation schemaValidation) {
+	private Set<CmsItemLock> transformItem(CmsItemId baseItemId, TransformConfig config, TransformerService transformerService, TransformOptions transformOptions, CmsPatchset patchset, TransformSchemaValidation schemaValidation, TransformResult result) {
 		
 		logger.debug("Transforming itemid: {}", baseItemId);
 		final CmsItemPropertiesMap props = getProperties(baseItemId, config);
@@ -396,7 +414,7 @@ public class TransformServiceXsl implements TransformService {
 			// Assume only non-principal output if the output path is explicitly set to repo root.
 			if (outputPath != null) {
 				CmsItemPath path = outputPath.append(baseItemId.getRelPath().getName());
-				CmsItemLock lock = addToPatchset(patchset, path, validateSchema(schemaValidation, path, baseStreamProvider.get()), overwrite, props);
+				CmsItemLock lock = addToPatchset(patchset, path, validateSchema(schemaValidation, path, baseStreamProvider.get()), overwrite, props, result);
 				if (lock != null) locked.add(lock); // Added items are not locked.
 			} else {
 				// Discard the principal output.
@@ -422,7 +440,7 @@ public class TransformServiceXsl implements TransformService {
 				
 				XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(href);
 				TransformStreamProvider streamProvider = transformerOutput.getTransformStreamProvider(resultDocument, null);
-				CmsItemLock lock = addToPatchset(patchset, path, validateSchema(schemaValidation, path, streamProvider.get()), overwrite, props);
+				CmsItemLock lock = addToPatchset(patchset, path, validateSchema(schemaValidation, path, streamProvider.get()), overwrite, props, result);
 				if (lock != null) locked.add(lock);
 			}
 		} catch (RuntimeException e) {
@@ -495,7 +513,11 @@ public class TransformServiceXsl implements TransformService {
 		}
 	}
 
-	private CmsItemLock addToPatchset(CmsPatchset patchset, CmsItemPath relPath, InputStream stream, boolean overwrite, CmsItemPropertiesMap properties) {
+	/**
+	 * @param result records the item, in a dry run the item is not locked, existing locks are recorded instead
+	 * @return the lock taken, null if none
+	 */
+	private CmsItemLock addToPatchset(CmsPatchset patchset, CmsItemPath relPath, InputStream stream, boolean overwrite, CmsItemPropertiesMap properties, TransformResult result) {
 		CmsItemLock lock = null;
 		try {
 			final InputStream inputStream = getInputStreamNotEmpty(stream);
@@ -506,7 +528,18 @@ public class TransformServiceXsl implements TransformService {
 				FileAdd fileAdd = new FileAdd(relPath, inputStream);
 				fileAdd.setPropertyChange(properties);
 				patchset.add(fileAdd);
-			} else if (overwrite){
+				result.addAdded(relPath);
+			} else if (overwrite && result.isDryRun()) {
+				CmsItemId itemId = patchset.getRepository().getItemId().withRelPath(relPath);
+				CmsItemLock existing = itemLookup.getLocked(itemId);
+				if (existing != null) {
+					logger.warn("Dry run, existing file at path '{}' is locked by '{}' (comment: '{}'), the transform would fail.", relPath.getPath(), existing.getOwner(), existing.getComment());
+					result.addLocked(relPath, existing);
+				} else {
+					logger.debug("Dry run, existing file at path '{}' would be modified.", relPath.getPath());
+				}
+				result.addModified(relPath);
+			} else if (overwrite) {
 				logger.debug("Overwrite is allowed, existing file at path '{}' will be modified.", relPath.getPath());
 				CmsItemId itemId = patchset.getRepository().getItemId().withRelPath(relPath);
 				CmsItemLockCollection locks = commit.lock(TRANSFORM_LOCK_COMMENT, patchset.getBaseRevision(), itemId.getRelPath());
@@ -518,6 +551,7 @@ public class TransformServiceXsl implements TransformService {
 				FileModificationLocked fileMod = new FileModificationLocked(relPath, inputStream);
 				fileMod.setPropertyChange(properties);
 				patchset.add(fileMod);
+				result.addModified(relPath);
 			} else {
 				throw new IllegalStateException("Item already exists, config prohibiting overwrite of existing items: " + relPath);
 			}
