@@ -19,6 +19,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -729,7 +730,7 @@ public class TransformServiceXslTest {
 		optionsParams.put("stylesheet", stylesheet);
 		optionsParams.put("overwrite", "true");
 		optionsParams.put("comment", "Dry run transform");
-		optionsParams.put("DryRun", "true");
+		optionsParams.put("dryrun", "true");
 
 		TransformConfigOptions configOptions = new TransformConfigOptions();
 		configOptions.setType("xsl");
@@ -764,7 +765,6 @@ public class TransformServiceXslTest {
 		assertEquals(List.of(new CmsItemPath("/doc/transform-test.xml")), result.getModified());
 		assertTrue(result.getAdded().toString(), result.getAdded().contains(new CmsItemPath("/doc/sections/section1.xml")));
 		assertTrue(result.getAdded().toString(), result.getAdded().contains(new CmsItemPath("/doc/sections/section2.xml")));
-		assertTrue(result.getLocked().isEmpty());
 
 		assertEquals("nothing committed", youngest.getNumber(), repoLookup.getYoungest(repo).getNumber());
 		assertEquals("unchanged", contentsBefore, getContents(itemId));
@@ -781,29 +781,32 @@ public class TransformServiceXslTest {
 		assertFalse(json.has("revision"));
 		assertEquals(1, json.get("modifiedCount").asInt());
 		assertEquals("/doc/transform-test.xml", json.get("modified").get(0).asText());
-		assertEquals(0, json.get("lockedCount").asInt());
 	}
 
 	@Test
-	public void testDryRunReportsExistingLock() throws Exception {
+	public void testDryRunFailsOnExistingLock() throws Exception {
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
 		RepoRevision youngest = repoLookup.getYoungest(repo);
 		CmsItemLock lock = commit.lock("Editing", youngest, itemId.getRelPath()).getSingle();
 		assertNotNull(lock);
 
-		TransformResult result = transformService.transform(itemId, getConfigDryRunOverwrite("/stylesheet/transform-single-output.xsl"));
+		TransformDryRunException e = assertThrows(TransformDryRunException.class,
+				() -> transformService.transform(itemId, getConfigDryRunOverwrite("/stylesheet/transform-single-output.xsl")));
 
-		assertEquals(List.of(new CmsItemPath("/doc/transform-test.xml")), result.getModified());
-		assertEquals(1, result.getLocked().size());
-		CmsItemLock reported = result.getLocked().get(new CmsItemPath("/doc/transform-test.xml"));
+		assertEquals("Dry run failed: 1 items locked", e.getMessage());
+		assertEquals("TransformLocked", e.getErrorName());
+		assertNull(e.getValidation());
+		CmsItemLock reported = e.getLocked().get(new CmsItemPath("/doc/transform-test.xml"));
 		assertNotNull(reported);
 		assertEquals(lock.getToken(), reported.getToken());
 		assertEquals("Editing", reported.getComment());
 		assertEquals("nothing committed", youngest.getNumber(), repoLookup.getYoungest(repo).getNumber());
 		assertEquals("existing lock is kept", lock.getToken(), lookup.getLocked(itemId).getToken());
 
-		JsonNode json = new ObjectMapper().readTree(result.toJson(new ObjectMapper().writer(), TransformResult.JSON_MAX_LENGTH));
-		assertEquals("Dry run, nothing committed: 0 items added, 1 items modified, 1 items locked", json.get("message").asText());
+		JsonNode json = new ObjectMapper().readTree(e.toJson(new ObjectMapper().writer(), TransformResult.JSON_MAX_LENGTH));
+		assertEquals("Dry run failed: 1 items locked", json.get("message").asText());
+		assertTrue(json.get("dryRun").asBoolean());
+		assertFalse("no validation requested", json.has("issues"));
 		assertEquals(1, json.get("lockedCount").asInt());
 		assertEquals("/doc/transform-test.xml", json.get("locked").get(0).get("path").asText());
 		assertEquals("Editing", json.get("locked").get(0).get("comment").asText());
@@ -816,7 +819,7 @@ public class TransformServiceXslTest {
 		config.getOptions().getRevprops().put("InvalidKeyNoColon", "x");
 		try {
 			transformService.transform(new CmsItemIdArg(transformTestDoc), config);
-			fail("Should fail on the revprop key, same as without DryRun.");
+			fail("Should fail on the revprop key, same as without dryrun.");
 		} catch (IllegalArgumentException e) {
 			assertTrue(e.getMessage(), e.getMessage().startsWith("Invalid revprop key: 'InvalidKeyNoColon'"));
 		}

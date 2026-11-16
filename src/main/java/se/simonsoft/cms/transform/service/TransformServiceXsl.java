@@ -68,6 +68,7 @@ import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.transform.config.databind.TransformImportOptions;
 import se.simonsoft.cms.transform.lookup.CmsItemLookupTransform;
 import se.simonsoft.cms.transform.schema.TransformSchemaService;
+import se.simonsoft.cms.transform.schema.TransformSchemaValidationException;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceDocumentS9api;
 import se.simonsoft.cms.xmlsource.handler.s9api.XmlSourceReaderS9api;
 import se.simonsoft.cms.xmlsource.transform.SaxonOutputURIResolverXdm;
@@ -101,8 +102,9 @@ public class TransformServiceXsl implements TransformService {
 	// Same name as the config option used by release and Fonto (ReleaseConfiguration in cms-release).
 	private static final String PARAM_SCHEMA_QUALIFIED_NAME = "SchemaQualifiedName";
 	private static final String PARAM_SCHEMA_VARIANT = "SchemaVariant";
-	// Transform and validate without locking or committing, report the existing locks instead.
-	private static final String PARAM_DRY_RUN = "DryRun";
+	// Transform and validate without locking or committing, fail if items that would be modified are locked.
+	// Lowercase like the AWS CLI --dryrun, so also forwarded to the XSL like the other lowercase params.
+	private static final String PARAM_DRYRUN = "dryrun";
 
 	private static final int HTTP_URL_CONNECTION_READ_TIMEOUT = 60000;  	// 60 seconds
 	private static final int HTTP_URL_CONNECTION_CONNECT_TIMEOUT = 30000;  	// 30 seconds
@@ -165,7 +167,7 @@ public class TransformServiceXsl implements TransformService {
 		}
 		
 		final TransformSchemaValidation schemaValidation = getSchemaValidation(config.getOptions().getParams(), baseItemId);
-		final boolean dryRun = Boolean.parseBoolean(config.getOptions().getParams().get(PARAM_DRY_RUN));
+		final boolean dryRun = Boolean.parseBoolean(config.getOptions().getParams().get(PARAM_DRYRUN));
 		final TransformResult result = new TransformResult(dryRun, baseRevision);
 		if (dryRun) {
 			logger.info("Transform dry run, nothing will be locked or committed: {}", baseItemId);
@@ -218,8 +220,12 @@ public class TransformServiceXsl implements TransformService {
 		if (schemaValidation != null) {
 			try {
 				schemaValidation.complete();
-			} catch (RuntimeException e) {
+			} catch (TransformSchemaValidationException e) {
 				// Nothing is committed if any item fails validation.
+				unlockItemsFailure(locked);
+				// The dry run also reports the locks, the validation issues have priority.
+				throw dryRun ? new TransformDryRunException(e, result.getLocked()) : e;
+			} catch (RuntimeException e) {
 				unlockItemsFailure(locked);
 				throw e;
 			}
@@ -234,11 +240,12 @@ public class TransformServiceXsl implements TransformService {
 		applyRevisionProperties(patchset, config.getOptions().getRevprops());
 
 		if (dryRun) {
-			if (result.getLocked().isEmpty()) {
-				logger.info("{} (base revision {})", result.getMessage(), baseRevision.getNumber());
-			} else {
-				logger.warn("{} (base revision {}), the transform would fail on the locked items: {}", result.getMessage(), baseRevision.getNumber(), result.getLocked().keySet());
+			if (!result.getLocked().isEmpty()) {
+				// The transform would fail when locking these items.
+				logger.warn("Dry run failed, items are locked (base revision {}): {}", baseRevision.getNumber(), result.getLocked().keySet());
+				throw new TransformDryRunException(null, result.getLocked());
 			}
+			logger.info("{} (base revision {})", result.getMessage(), baseRevision.getNumber());
 			return result;
 		}
 
@@ -533,7 +540,7 @@ public class TransformServiceXsl implements TransformService {
 				CmsItemId itemId = patchset.getRepository().getItemId().withRelPath(relPath);
 				CmsItemLock existing = itemLookup.getLocked(itemId);
 				if (existing != null) {
-					logger.warn("Dry run, existing file at path '{}' is locked by '{}' (comment: '{}'), the transform would fail.", relPath.getPath(), existing.getOwner(), existing.getComment());
+					logger.warn("Dry run, existing file at path '{}' is locked by '{}' (comment: '{}'), the dry run will fail.", relPath.getPath(), existing.getOwner(), existing.getComment());
 					result.addLocked(relPath, existing);
 				} else {
 					logger.debug("Dry run, existing file at path '{}' would be modified.", relPath.getPath());

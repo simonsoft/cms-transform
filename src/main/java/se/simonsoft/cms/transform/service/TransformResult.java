@@ -33,7 +33,7 @@ import se.simonsoft.cms.item.CmsItemPath;
 import se.simonsoft.cms.item.RepoRevision;
 
 /**
- * The items of one transform, added and modified, and in a dry run the existing locks that would make the commit fail.
+ * The items of one transform, added and modified.
  */
 public class TransformResult {
 
@@ -71,7 +71,7 @@ public class TransformResult {
 	}
 
 	/**
-	 * @return true if nothing was committed (DryRun param)
+	 * @return true if nothing was committed (param dryrun)
 	 */
 	public boolean isDryRun() {
 		return dryRun;
@@ -97,22 +97,22 @@ public class TransformResult {
 	}
 
 	/**
-	 * Only in a dry run, the real transform takes the locks and fails if an item is already locked.
+	 * Only in a dry run, collected for {@link TransformDryRunException}. The transform takes the locks instead.
 	 * @return existing locks on the items that would be modified
 	 */
-	public Map<CmsItemPath, CmsItemLock> getLocked() {
+	Map<CmsItemPath, CmsItemLock> getLocked() {
 		return Collections.unmodifiableMap(locked);
 	}
 
 	public String getMessage() {
-		return String.format("%s: %d items added, %d items modified, %d items locked",
-				dryRun ? "Dry run, nothing committed" : "Transform committed", added.size(), modified.size(), locked.size());
+		return String.format("%s: %d items added, %d items modified",
+				dryRun ? "Dry run, nothing committed" : "Transform committed", added.size(), modified.size());
 	}
 
 	/**
-	 * The locks first, then modified and added paths, as many as fit within maxLength (UTF-8 bytes), the lists after a truncated list are omitted.
-	 * The remaining are counted in 'lockedOmitted', 'modifiedOmitted' and 'addedOmitted'.
-	 * @return JSON with the message, base revision, counts, locks (path, owner, comment, created) and paths
+	 * The modified paths first, then the added paths, as many as fit within maxLength (UTF-8 bytes).
+	 * The remaining are counted in 'modifiedOmitted' and 'addedOmitted', the added paths are omitted if the modified paths are truncated.
+	 * @return JSON with the message, base revision, revision (unless dry run), counts and paths
 	 */
 	public String toJson(ObjectWriter writer, int maxLength) {
 		ObjectNode result = JsonNodeFactory.instance.objectNode();
@@ -124,42 +124,18 @@ public class TransformResult {
 		}
 		result.put("addedCount", added.size());
 		result.put("modifiedCount", modified.size());
-		result.put("lockedCount", locked.size());
-		ArrayNode lockedArray = result.putArray("locked");
 		ArrayNode modifiedArray = result.putArray("modified");
 		ArrayNode addedArray = result.putArray("added");
 		// At least as long as the final values.
-		result.put("lockedOmitted", locked.size());
 		result.put("modifiedOmitted", modified.size());
 		result.put("addedOmitted", added.size());
 
 		int length = getLength(writer, result);
-		boolean full = false;
-		for (Map.Entry<CmsItemPath, CmsItemLock> e : locked.entrySet()) {
-			ObjectNode node = JsonNodeFactory.instance.objectNode();
-			node.put("path", e.getKey().getPath());
-			node.put("owner", e.getValue().getOwner());
-			node.put("comment", e.getValue().getComment());
-			if (e.getValue().getDateCreation() != null) {
-				node.put("created", e.getValue().getDateCreation().toInstant().toString());
-			}
-			int nodeLength = getLength(writer, node) + 1; // Separator.
-			if (length + nodeLength > maxLength) {
-				full = true;
-				break;
-			}
-			lockedArray.add(node);
-			length += nodeLength;
-		}
-		// Once a list is truncated, the following lists are omitted.
-		if (!full) {
-			length = addPaths(writer, modifiedArray, modified, length, maxLength);
-		}
-		if (!full && modifiedArray.size() == modified.size()) {
+		length = addPaths(writer, modifiedArray, modified, length, maxLength);
+		if (modifiedArray.size() == modified.size()) {
 			addPaths(writer, addedArray, added, length, maxLength);
 		}
 
-		result.put("lockedOmitted", locked.size() - lockedArray.size());
 		result.put("modifiedOmitted", modified.size() - modifiedArray.size());
 		result.put("addedOmitted", added.size() - addedArray.size());
 		return toString(writer, result);

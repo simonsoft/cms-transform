@@ -30,6 +30,7 @@ import se.simonsoft.cms.item.command.CommandRuntimeException;
 import se.simonsoft.cms.item.command.ExternalCommandHandler;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.transform.schema.TransformSchemaValidationException;
+import se.simonsoft.cms.transform.service.TransformDryRunException;
 import se.simonsoft.cms.transform.service.TransformResult;
 import se.simonsoft.cms.transform.service.TransformService;
 
@@ -70,13 +71,17 @@ public class TransformCommandHandler implements ExternalCommandHandler<Transform
 			// The issues are logged as warnings during validation.
 			logger.error("Transform failed '{}': {}", arguments, e.getMessage());
 			throw new CommandRuntimeException(TransformSchemaValidationException.ERROR_NAME, e.toJson(writer, TransformSchemaValidationException.JSON_MAX_LENGTH));
+		} catch (TransformDryRunException e) {
+			// The issues and locks are logged as warnings during the dry run.
+			logger.error("Transform dry run failed '{}': {}", arguments, e.getMessage());
+			throw new CommandRuntimeException(e.getErrorName(), e.toJson(writer, TransformSchemaValidationException.JSON_MAX_LENGTH));
 		} catch (Exception e) {
 			// TODO: Catch more specific exceptions in order to control whether retry is suitable.
 			logger.error("Transform failed '{}': {}", arguments, e.getMessage(), e);
 			throw new CommandRuntimeException("TransformFailed", e.getMessage());
 		}
 		if (result != null && result.isDryRun()) {
-			// The items and existing locks, e.g. the Step Functions task output.
+			// The items that would be added / modified, e.g. the Step Functions task output.
 			return result.toJson(writer, TransformResult.JSON_MAX_LENGTH);
 		}
 		return null; // Must return JSON. Consider defining a return type instead of String.

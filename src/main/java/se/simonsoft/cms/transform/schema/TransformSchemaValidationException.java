@@ -78,6 +78,13 @@ public class TransformSchemaValidationException extends RuntimeException {
 	 * @return JSON with the message, counts and issues (path, level, line, column, element, message)
 	 */
 	public String toJson(ObjectWriter writer, int maxLength) {
+		return toString(writer, toJsonNode(writer, maxLength));
+	}
+
+	/**
+	 * @return see {@link #toJson(ObjectWriter, int)}, for adding fields within the remaining length
+	 */
+	public ObjectNode toJsonNode(ObjectWriter writer, int maxLength) {
 		ObjectNode result = JsonNodeFactory.instance.objectNode();
 		result.put("message", getMessage());
 		result.put("itemCount", itemCount);
@@ -103,7 +110,7 @@ public class TransformSchemaValidationException extends RuntimeException {
 			length += nodeLength;
 		}
 		result.put("issuesOmitted", issues.size() - array.size());
-		return toString(writer, result);
+		return result;
 	}
 
 	private static int getLength(ObjectWriter writer, ObjectNode node) {
