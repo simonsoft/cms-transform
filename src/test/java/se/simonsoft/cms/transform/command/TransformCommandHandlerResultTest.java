@@ -16,7 +16,7 @@
 package se.simonsoft.cms.transform.command;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
@@ -45,9 +45,9 @@ import se.simonsoft.cms.transform.service.TransformResult;
 import se.simonsoft.cms.transform.service.TransformService;
 
 /**
- * The dry run result as command response or failure, e.g. the Step Functions task output or failure.
+ * The result as command response, and the dry run failure, e.g. the Step Functions task output or failure.
  */
-public class TransformCommandHandlerDryRunTest {
+public class TransformCommandHandlerResultTest {
 
 	private final CmsItemIdArg itemId = new CmsItemIdArg("x-svn:///svn/repo1/doc");
 	private final ObjectMapper mapper = new ObjectMapper();
@@ -113,8 +113,10 @@ public class TransformCommandHandlerDryRunTest {
 	}
 
 	@Test
-	public void testCommitNoResponse() throws Exception {
-		// Unchanged response when committed.
-		assertNull(getHandler(new TransformResult(false, new RepoRevision(12, null)), null).handleExternalCommand(itemId, getConfig()));
+	public void testCommitResponse() throws Exception {
+		String response = getHandler(new TransformResult(false, new RepoRevision(12, null)), null).handleExternalCommand(itemId, getConfig());
+		JsonNode json = mapper.readTree(response);
+		assertFalse(json.get("dryrun").asBoolean());
+		assertEquals(12, json.get("baseRevision").asLong());
 	}
 }

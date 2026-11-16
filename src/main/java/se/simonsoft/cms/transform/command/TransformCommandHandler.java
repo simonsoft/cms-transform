@@ -80,11 +80,8 @@ public class TransformCommandHandler implements ExternalCommandHandler<Transform
 			logger.error("Transform failed '{}': {}", arguments, e.getMessage(), e);
 			throw new CommandRuntimeException("TransformFailed", e.getMessage());
 		}
-		if (result != null && result.isDryRun()) {
-			// The items that would be added / modified, e.g. the Step Functions task output.
-			return result.toJson(writer, TransformResult.JSON_MAX_LENGTH);
-		}
-		return null; // Must return JSON. Consider defining a return type instead of String.
+		// The items added / modified (would be, in a dry run), e.g. the Step Functions task output.
+		return result.toJson(writer, TransformResult.JSON_MAX_LENGTH);
 	}
 
 }

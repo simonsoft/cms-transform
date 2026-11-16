@@ -16,6 +16,7 @@
 package se.simonsoft.cms.transform.service;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -153,9 +154,17 @@ public class TransformServiceXslSchemaTest {
 		params.put("SchemaValidate", "true");
 
 		// Topic and map are validated with the built-in ditabase and ditamap schemas respectively.
-		transformService.transform(new CmsItemIdArg(transformTestDoc), getConfig(params));
+		TransformResult result = transformService.transform(new CmsItemIdArg(transformTestDoc), getConfig(params));
 
 		assertEquals(youngest + 1, repoLookup.getYoungest(repo).getNumber());
+		assertFalse(result.isDryRun());
+		assertEquals(youngest, result.getBaseRevision().getNumber());
+		assertEquals(youngest + 1, result.getRevision().getNumber());
+		assertEquals(List.of(new CmsItemPath("/doc/transform-test.xml")), result.getModified());
+		assertEquals(List.of(new CmsItemPath("/doc/transform-test-map.ditamap")), result.getAdded());
+		JsonNode json = new ObjectMapper().readTree(result.toJson(new ObjectMapper().writer(), TransformResult.JSON_MAX_LENGTH));
+		assertEquals("Transform committed: 1 items added, 1 items modified", json.get("message").asText());
+		assertEquals(youngest + 1, json.get("revision").asLong());
 		assertTrue(getContents(transformTestMap).contains("<techdocmap>"));
 		assertTrue(getContents(transformTestDoc).contains("<subtitle>"));
 	}
