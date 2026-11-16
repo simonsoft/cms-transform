@@ -777,7 +777,7 @@ public class TransformServiceXslTest {
 		}
 
 		JsonNode json = new ObjectMapper().readTree(result.toJson(new ObjectMapper().writer(), TransformResult.JSON_MAX_LENGTH));
-		assertTrue(json.get("dryRun").asBoolean());
+		assertTrue(json.get("dryrun").asBoolean());
 		assertFalse(json.has("revision"));
 		assertEquals(1, json.get("modifiedCount").asInt());
 		assertEquals("/doc/transform-test.xml", json.get("modified").get(0).asText());
@@ -805,7 +805,7 @@ public class TransformServiceXslTest {
 
 		JsonNode json = new ObjectMapper().readTree(e.toJson(new ObjectMapper().writer(), TransformResult.JSON_MAX_LENGTH));
 		assertEquals("Dry run failed: 1 items locked", json.get("message").asText());
-		assertTrue(json.get("dryRun").asBoolean());
+		assertTrue(json.get("dryrun").asBoolean());
 		assertFalse("no validation requested", json.has("issues"));
 		assertEquals(1, json.get("lockedCount").asInt());
 		assertEquals("/doc/transform-test.xml", json.get("locked").get(0).get("path").asText());

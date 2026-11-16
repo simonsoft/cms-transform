@@ -87,7 +87,7 @@ public class TransformCommandHandlerDryRunTest {
 	public void testDryRunResponse() throws Exception {
 		String response = getHandler(new TransformResult(true, new RepoRevision(12, null)), null).handleExternalCommand(itemId, getConfig());
 		JsonNode json = mapper.readTree(response);
-		assertTrue(json.get("dryRun").asBoolean());
+		assertTrue(json.get("dryrun").asBoolean());
 		assertEquals(12, json.get("baseRevision").asLong());
 	}
 

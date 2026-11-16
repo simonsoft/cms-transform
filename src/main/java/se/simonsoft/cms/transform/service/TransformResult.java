@@ -117,7 +117,7 @@ public class TransformResult {
 	public String toJson(ObjectWriter writer, int maxLength) {
 		ObjectNode result = JsonNodeFactory.instance.objectNode();
 		result.put("message", getMessage());
-		result.put("dryRun", dryRun);
+		result.put("dryrun", dryRun);
 		result.put("baseRevision", baseRevision.getNumber());
 		if (revision != null) {
 			result.put("revision", revision.getNumber());

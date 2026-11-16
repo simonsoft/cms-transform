@@ -39,7 +39,7 @@ public class TransformResultTest {
 
 		JsonNode json = mapper.readTree(result.toJson(mapper.writer(), TransformResult.JSON_MAX_LENGTH));
 		assertEquals("Dry run, nothing committed: 1 items added, 1 items modified", json.get("message").asText());
-		assertTrue(json.get("dryRun").asBoolean());
+		assertTrue(json.get("dryrun").asBoolean());
 		assertEquals(12, json.get("baseRevision").asLong());
 		assertFalse(json.has("revision"));
 		assertEquals("/doc/sections/section1.xml", json.get("added").get(0).asText());

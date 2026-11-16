@@ -95,7 +95,7 @@ public class TransformDryRunException extends RuntimeException {
 	public String toJson(ObjectWriter writer, int maxLength) {
 		ObjectNode result = validation != null ? validation.toJsonNode(writer, maxLength - JSON_LOCKED_MIN_LENGTH) : JsonNodeFactory.instance.objectNode();
 		result.put("message", getMessage()); // Replaces the validation message, keeping its position.
-		result.put("dryRun", true);
+		result.put("dryrun", true);
 		result.put("lockedCount", locked.size());
 		ArrayNode array = result.putArray("locked");
 		result.put("lockedOmitted", locked.size()); // At least as long as the final value.

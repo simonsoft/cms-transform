@@ -79,7 +79,7 @@ public class TransformDryRunExceptionTest {
 
 		JsonNode json = mapper.readTree(e.toJson(mapper.writer(), TransformSchemaValidationException.JSON_MAX_LENGTH));
 		assertEquals("Dry run failed: 1 items locked", json.get("message").asText());
-		assertTrue(json.get("dryRun").asBoolean());
+		assertTrue(json.get("dryrun").asBoolean());
 		assertFalse(json.has("issues"));
 		assertEquals(1, json.get("lockedCount").asInt());
 		JsonNode lock = json.get("locked").get(0);
