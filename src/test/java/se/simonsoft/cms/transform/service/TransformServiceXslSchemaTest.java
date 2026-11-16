@@ -16,14 +16,20 @@
 package se.simonsoft.cms.transform.service;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.junit.After;
 import org.junit.Before;
@@ -35,8 +41,10 @@ import se.simonsoft.cms.backend.filexml.FilexmlCommit;
 import se.simonsoft.cms.backend.filexml.FilexmlSourceClasspath;
 import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
+import se.simonsoft.cms.item.CmsItemLock;
 import se.simonsoft.cms.item.CmsItemPath;
 import se.simonsoft.cms.item.CmsRepository;
+import se.simonsoft.cms.item.RepoRevision;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
 import se.simonsoft.cms.item.info.CmsItemNotFoundException;
@@ -146,11 +154,79 @@ public class TransformServiceXslSchemaTest {
 		params.put("SchemaValidate", "true");
 
 		// Topic and map are validated with the built-in ditabase and ditamap schemas respectively.
-		transformService.transform(new CmsItemIdArg(transformTestDoc), getConfig(params));
+		TransformResult result = transformService.transform(new CmsItemIdArg(transformTestDoc), getConfig(params));
 
 		assertEquals(youngest + 1, repoLookup.getYoungest(repo).getNumber());
+		assertFalse(result.isDryRun());
+		assertEquals(youngest, result.getBaseRevision().getNumber());
+		assertEquals(youngest + 1, result.getRevision().getNumber());
+		assertEquals(List.of(new CmsItemPath("/doc/transform-test.xml")), result.getModified());
+		assertEquals(List.of(new CmsItemPath("/doc/transform-test-map.ditamap")), result.getAdded());
+		JsonNode json = new ObjectMapper().readTree(result.toJson(new ObjectMapper().writer(), TransformResult.JSON_MAX_LENGTH));
+		assertEquals("Transform committed: 1 items added, 1 items modified", json.get("message").asText());
+		assertEquals(youngest + 1, json.get("revision").asLong());
 		assertTrue(getContents(transformTestMap).contains("<techdocmap>"));
 		assertTrue(getContents(transformTestDoc).contains("<subtitle>"));
+	}
+
+	@Test
+	public void testDryRunValidNotCommitted() throws Exception {
+		long youngest = repoLookup.getYoungest(repo).getNumber();
+		Map<String, String> params = new HashMap<>();
+		params.put("SchemaValidate", "true");
+		params.put("dryrun", "true");
+
+		TransformResult result = transformService.transform(new CmsItemIdArg(transformTestDoc), getConfig(params));
+
+		assertTrue(result.isDryRun());
+		assertEquals(List.of(new CmsItemPath("/doc/transform-test.xml")), result.getModified());
+		assertEquals(List.of(new CmsItemPath("/doc/transform-test-map.ditamap")), result.getAdded());
+		assertNotCommittedAndUnlocked(youngest);
+	}
+
+	@Test
+	public void testDryRunInvalidFails() throws Exception {
+		long youngest = repoLookup.getYoungest(repo).getNumber();
+		Map<String, String> params = new HashMap<>();
+		params.put("SchemaValidate", "true");
+		params.put("dryrun", "true");
+		params.put("invalid", "true"); // XSL param
+
+		// Same error name and issues as without dryrun.
+		TransformDryRunException e = assertThrows(TransformDryRunException.class,
+				() -> transformService.transform(new CmsItemIdArg(transformTestDoc), getConfig(params)));
+		assertEquals("SchemaValidationFailed", e.getErrorName());
+		assertEquals("Schema validation failed: 2 of 2 items, 4 issues", e.getValidation().getMessage());
+		assertEquals("Dry run, Schema validation failed: 2 of 2 items, 4 issues, 0 items locked", e.getMessage());
+		assertTrue(e.getLocked().isEmpty());
+		assertNotCommittedAndUnlocked(youngest);
+	}
+
+	@Test
+	public void testDryRunInvalidAndLocked() throws Exception {
+		long youngest = repoLookup.getYoungest(repo).getNumber();
+		CmsItemLock lock = commit.lock("Editing", new RepoRevision(youngest, null), new CmsItemPath("/doc/transform-test.xml")).getSingle();
+		Map<String, String> params = new HashMap<>();
+		params.put("SchemaValidate", "true");
+		params.put("dryrun", "true");
+		params.put("invalid", "true"); // XSL param
+
+		TransformDryRunException e = assertThrows(TransformDryRunException.class,
+				() -> transformService.transform(new CmsItemIdArg(transformTestDoc), getConfig(params)));
+		// Validation has priority.
+		assertEquals("SchemaValidationFailed", e.getErrorName());
+		assertEquals("Dry run, Schema validation failed: 2 of 2 items, 4 issues, 1 items locked", e.getMessage());
+		assertEquals(lock.getToken(), e.getLocked().get(new CmsItemPath("/doc/transform-test.xml")).getToken());
+
+		ObjectMapper mapper = new ObjectMapper();
+		JsonNode json = mapper.readTree(e.toJson(mapper.writer(), TransformSchemaValidationException.JSON_MAX_LENGTH));
+		assertEquals(e.getMessage(), json.get("message").asText());
+		assertEquals(4, json.get("issues").size());
+		assertEquals(1, json.get("lockedCount").asInt());
+		assertEquals("/doc/transform-test.xml", json.get("locked").get(0).get("path").asText());
+
+		commit.unlock(lock);
+		assertNotCommittedAndUnlocked(youngest);
 	}
 
 	@Test

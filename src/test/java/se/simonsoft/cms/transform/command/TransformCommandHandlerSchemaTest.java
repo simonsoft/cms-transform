@@ -37,6 +37,7 @@ import se.simonsoft.cms.transform.config.databind.TransformConfigOptions;
 import se.simonsoft.cms.transform.config.databind.TransformImportOptions;
 import se.simonsoft.cms.transform.schema.TransformSchemaValidationException;
 import se.simonsoft.cms.transform.schema.TransformSchemaValidationIssue;
+import se.simonsoft.cms.transform.service.TransformResult;
 import se.simonsoft.cms.transform.service.TransformService;
 import se.simonsoft.cms.xmlsource.validation.SchemaValidationError;
 
@@ -50,7 +51,7 @@ public class TransformCommandHandlerSchemaTest {
 
 	private final TransformService transformServiceInvalid = new TransformService() {
 		@Override
-		public void transform(CmsItemId item, TransformConfig config) {
+		public TransformResult transform(CmsItemId item, TransformConfig config) {
 			throw getException();
 		}
 

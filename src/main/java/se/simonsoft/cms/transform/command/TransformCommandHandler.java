@@ -30,6 +30,8 @@ import se.simonsoft.cms.item.command.CommandRuntimeException;
 import se.simonsoft.cms.item.command.ExternalCommandHandler;
 import se.simonsoft.cms.transform.config.databind.TransformConfig;
 import se.simonsoft.cms.transform.schema.TransformSchemaValidationException;
+import se.simonsoft.cms.transform.service.TransformDryRunException;
+import se.simonsoft.cms.transform.service.TransformResult;
 import se.simonsoft.cms.transform.service.TransformService;
 
 public class TransformCommandHandler implements ExternalCommandHandler<TransformConfig> {
@@ -61,19 +63,25 @@ public class TransformCommandHandler implements ExternalCommandHandler<Transform
 		}
 		
 		TransformService transformService = this.transformServiceMap.get(item.getRepository());
+		final TransformResult result;
 		try {
-			transformService.transform(item, arguments);
+			result = transformService.transform(item, arguments);
 			logger.debug("Transformed with config: '{}'", arguments);
 		} catch (TransformSchemaValidationException e) {
 			// The issues are logged as warnings during validation.
 			logger.error("Transform failed '{}': {}", arguments, e.getMessage());
 			throw new CommandRuntimeException(TransformSchemaValidationException.ERROR_NAME, e.toJson(writer, TransformSchemaValidationException.JSON_MAX_LENGTH));
+		} catch (TransformDryRunException e) {
+			// The issues and locks are logged as warnings during the dry run.
+			logger.error("Transform dry run failed '{}': {}", arguments, e.getMessage());
+			throw new CommandRuntimeException(e.getErrorName(), e.toJson(writer, TransformSchemaValidationException.JSON_MAX_LENGTH));
 		} catch (Exception e) {
 			// TODO: Catch more specific exceptions in order to control whether retry is suitable.
 			logger.error("Transform failed '{}': {}", arguments, e.getMessage(), e);
 			throw new CommandRuntimeException("TransformFailed", e.getMessage());
 		}
-		return null; // Must return JSON. Consider defining a return type instead of String.
+		// The items added / modified (would be, in a dry run), e.g. the Step Functions task output.
+		return result.toJson(writer, TransformResult.JSON_MAX_LENGTH);
 	}
 
 }

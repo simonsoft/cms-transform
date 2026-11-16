@@ -17,6 +17,9 @@ package se.simonsoft.cms.transform.service;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -24,6 +27,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.After;
@@ -31,16 +35,22 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import se.repos.testing.indexing.ReposTestIndexing;
 import se.simonsoft.cms.backend.filexml.FilexmlCommit;
 import se.simonsoft.cms.backend.filexml.FilexmlSourceClasspath;
 import se.simonsoft.cms.item.CmsItem;
 import se.simonsoft.cms.item.CmsItemId;
+import se.simonsoft.cms.item.CmsItemLock;
 import se.simonsoft.cms.item.CmsItemPath;
 import se.simonsoft.cms.item.CmsRepository;
+import se.simonsoft.cms.item.RepoRevision;
 import se.simonsoft.cms.item.commit.CmsPatchset;
 import se.simonsoft.cms.item.impl.CmsItemIdArg;
 import se.simonsoft.cms.item.info.CmsItemLookup;
+import se.simonsoft.cms.item.info.CmsItemNotFoundException;
 import se.simonsoft.cms.item.info.CmsRepositoryLookup;
 import se.simonsoft.cms.item.naming.CmsItemNameFactory;
 import se.simonsoft.cms.item.properties.CmsItemProperties;
@@ -715,6 +725,106 @@ public class TransformServiceXslTest {
 		
 	}
 	
+	private TransformConfig getConfigDryRunOverwrite(String stylesheet) {
+		Map<String, String> optionsParams = new HashMap<String, String>();
+		optionsParams.put("stylesheet", stylesheet);
+		optionsParams.put("overwrite", "true");
+		optionsParams.put("comment", "Dry run transform");
+		optionsParams.put("dryrun", "true");
+
+		TransformConfigOptions configOptions = new TransformConfigOptions();
+		configOptions.setType("xsl");
+		configOptions.setParams(optionsParams);
+		Map<String, String> revprops = new HashMap<>();
+		revprops.put("cms:operation", "move");
+		configOptions.setRevprops(revprops);
+
+		TransformConfig config = new TransformConfig();
+		config.setActive(true);
+		config.setOptions(configOptions);
+		return config;
+	}
+
+	private String getContents(CmsItemId itemId) throws Exception {
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		lookup.getItem(itemId).getContents(baos);
+		return baos.toString(StandardCharsets.UTF_8.name());
+	}
+
+	@Test
+	public void testDryRunMultipleOutputOverwrite() throws Exception {
+		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
+		RepoRevision youngest = repoLookup.getYoungest(repo);
+		String contentsBefore = getContents(itemId);
+
+		TransformResult result = transformService.transform(itemId, getConfigDryRunOverwrite("/stylesheet/transform-multiple-output.xsl"));
+
+		assertTrue(result.isDryRun());
+		assertNull(result.getRevision());
+		assertEquals(youngest.getNumber(), result.getBaseRevision().getNumber());
+		assertEquals(List.of(new CmsItemPath("/doc/transform-test.xml")), result.getModified());
+		assertTrue(result.getAdded().toString(), result.getAdded().contains(new CmsItemPath("/doc/sections/section1.xml")));
+		assertTrue(result.getAdded().toString(), result.getAdded().contains(new CmsItemPath("/doc/sections/section2.xml")));
+
+		assertEquals("nothing committed", youngest.getNumber(), repoLookup.getYoungest(repo).getNumber());
+		assertEquals("unchanged", contentsBefore, getContents(itemId));
+		assertNull("not locked", lookup.getLocked(itemId));
+		try {
+			lookup.getItem(new CmsItemIdArg(repo, new CmsItemPath("/doc/sections/section1.xml")));
+			fail("Should not be added in a dry run.");
+		} catch (CmsItemNotFoundException e) {
+			// expected
+		}
+
+		JsonNode json = new ObjectMapper().readTree(result.toJson(new ObjectMapper().writer(), TransformResult.JSON_MAX_LENGTH));
+		assertTrue(json.get("dryrun").asBoolean());
+		assertFalse(json.has("revision"));
+		assertEquals(1, json.get("modifiedCount").asInt());
+		assertEquals("/doc/transform-test.xml", json.get("modified").get(0).asText());
+	}
+
+	@Test
+	public void testDryRunFailsOnExistingLock() throws Exception {
+		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
+		RepoRevision youngest = repoLookup.getYoungest(repo);
+		CmsItemLock lock = commit.lock("Editing", youngest, itemId.getRelPath()).getSingle();
+		assertNotNull(lock);
+
+		TransformDryRunException e = assertThrows(TransformDryRunException.class,
+				() -> transformService.transform(itemId, getConfigDryRunOverwrite("/stylesheet/transform-single-output.xsl")));
+
+		assertEquals("Dry run failed: 1 items locked", e.getMessage());
+		assertEquals("TransformLocked", e.getErrorName());
+		assertNull(e.getValidation());
+		CmsItemLock reported = e.getLocked().get(new CmsItemPath("/doc/transform-test.xml"));
+		assertNotNull(reported);
+		assertEquals(lock.getToken(), reported.getToken());
+		assertEquals("Editing", reported.getComment());
+		assertEquals("nothing committed", youngest.getNumber(), repoLookup.getYoungest(repo).getNumber());
+		assertEquals("existing lock is kept", lock.getToken(), lookup.getLocked(itemId).getToken());
+
+		JsonNode json = new ObjectMapper().readTree(e.toJson(new ObjectMapper().writer(), TransformResult.JSON_MAX_LENGTH));
+		assertEquals("Dry run failed: 1 items locked", json.get("message").asText());
+		assertTrue(json.get("dryrun").asBoolean());
+		assertFalse("no validation requested", json.has("issues"));
+		assertEquals(1, json.get("lockedCount").asInt());
+		assertEquals("/doc/transform-test.xml", json.get("locked").get(0).get("path").asText());
+		assertEquals("Editing", json.get("locked").get(0).get("comment").asText());
+		assertEquals(0, json.get("lockedOmitted").asInt());
+	}
+
+	@Test
+	public void testDryRunInvalidRevpropFails() throws Exception {
+		TransformConfig config = getConfigDryRunOverwrite("/stylesheet/transform-single-output.xsl");
+		config.getOptions().getRevprops().put("InvalidKeyNoColon", "x");
+		try {
+			transformService.transform(new CmsItemIdArg(transformTestDoc), config);
+			fail("Should fail on the revprop key, same as without dryrun.");
+		} catch (IllegalArgumentException e) {
+			assertTrue(e.getMessage(), e.getMessage().startsWith("Invalid revprop key: 'InvalidKeyNoColon'"));
+		}
+	}
+
 	@Test
 	@Ignore
 	public void testCommentIsVelocityString() throws Exception {
