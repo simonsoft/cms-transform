@@ -684,6 +684,55 @@ public class TransformServiceXslTest {
 	}
 	
 	@Test
+	public void testTextOutput() throws Exception {
+		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
+
+		Map<String, String> optionsParams = new HashMap<String, String>();
+		optionsParams.put("stylesheet", "/stylesheet/transform-text-output.xsl");
+		optionsParams.put("output", "");
+		optionsParams.put("comment", "Text output");
+		TransformConfigOptions configOptions = new TransformConfigOptions();
+		configOptions.setType("xsl");
+		configOptions.setParams(optionsParams);
+		TransformConfig config = new TransformConfig();
+		config.setActive(true);
+		config.setOptions(configOptions);
+
+		transformService.transform(itemId, config);
+
+		CmsItemId textId = new CmsItemIdArg(repo, new CmsItemPath("/doc/scripts/transform-test.txt"));
+		CmsItem textItem = lookup.getItem(textId);
+		assertEquals(itemId.getLogicalId(), textItem.getProperties().getString("abx:TransformBase"));
+		String text = getContents(textId);
+		assertEquals("Text output must not be XML serialized (no declaration, no escaping)",
+				"# Script with one line per section\n"
+				+ "svn propset meta:sample 'section1.xml' <path> &\n"
+				+ "svn propset meta:sample 'section2.xml' <path> &\n"
+				+ "svn propset meta:sample 'földer space/folder%20encoded/section3.xml' <path> &\n",
+				text);
+
+		CmsItemId noRootId = new CmsItemIdArg(repo, new CmsItemPath("/doc/scripts/no-root.xml"));
+		assertFalse("Result document without root element should be discarded", pathExists(noRootId));
+	}
+
+	private boolean pathExists(CmsItemId itemId) {
+		try {
+			lookup.getItem(itemId);
+			return true;
+		} catch (se.simonsoft.cms.item.info.CmsItemNotFoundException e) {
+			return false;
+		}
+	}
+
+	@Test
+	public void testEmptyExceptDeclaration() {
+		assertTrue(TransformServiceXsl.emptyExceptDeclaration("<?xml version=\"1.0\"?>\n "));
+		assertTrue(TransformServiceXsl.emptyExceptDeclaration(" \n"));
+		assertFalse(TransformServiceXsl.emptyExceptDeclaration("<?xml version=\"1.0\"?><a/>"));
+		assertFalse("Text without declaration", TransformServiceXsl.emptyExceptDeclaration("a"));
+	}
+
+	@Test
 	public void testEmptyTransformWillBeDiscarded() throws UnsupportedEncodingException {
 		
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);

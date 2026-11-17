@@ -216,6 +216,16 @@
 			</properties>
 		</entry>
 		<entry kind="file">
+			<name>stylesheet/transform-text-output.xsl</name>
+			<size>1518</size>
+			<commit revision="1">
+				<author>m</author>
+				<date>2013-01-04T14:33:14.600772Z</date>
+			</commit>
+			<properties>
+			</properties>
+		</entry>
+		<entry kind="file">
 			<name>strict/transform-test.xml</name>
 			<size>1578</size>
 			<commit revision="1">
