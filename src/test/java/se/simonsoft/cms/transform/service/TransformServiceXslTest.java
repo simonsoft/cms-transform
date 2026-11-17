@@ -715,6 +715,31 @@ public class TransformServiceXslTest {
 		assertFalse("Result document without root element should be discarded", pathExists(noRootId));
 	}
 
+	@Test
+	public void testTextOutputFolderConcatenated() throws Exception {
+		// Each item in the folder produces the same text result-document href.
+		CmsItemId folderId = new CmsItemIdArg("x-svn:///svn/repo1/transformed/multiple/existing");
+
+		Map<String, String> optionsParams = new HashMap<String, String>();
+		optionsParams.put("stylesheet", "/stylesheet/transform-text-output.xsl");
+		optionsParams.put("output", "");
+		optionsParams.put("comment", "Text output per folder");
+		TransformConfigOptions configOptions = new TransformConfigOptions();
+		configOptions.setType("xsl");
+		configOptions.setParams(optionsParams);
+		TransformConfig config = new TransformConfig();
+		config.setActive(true);
+		config.setOptions(configOptions);
+
+		transformService.transform(folderId, config);
+
+		CmsItemId textId = new CmsItemIdArg(repo, new CmsItemPath("/doc/scripts/transform-test.txt"));
+		assertEquals("Folder is the transform base of the concatenated output", folderId.getLogicalId(), lookup.getItem(textId).getProperties().getString("abx:TransformBase"));
+		String text = getContents(textId);
+		assertEquals("One text output per item, concatenated: " + text, 4, text.split("# Script with one line per section", -1).length - 1);
+		assertEquals("Sections of all items: " + text, 3 + 2, text.split("svn propset", -1).length - 1);
+	}
+
 	private boolean pathExists(CmsItemId itemId) {
 		try {
 			lookup.getItem(itemId);
