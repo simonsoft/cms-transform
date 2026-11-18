@@ -205,25 +205,27 @@ public class TransformServiceXsl implements TransformService {
 			throw new IllegalArgumentException("Param '" + PARAM_DIR + "' must be '" + DIR_IMMEDIATES + "' or '" + DIR_LIST + "': " + dir);
 		}
 
+		if (DIR_LIST.equals(dir) && item.getKind() != CmsItemKind.Folder) {
+			throw new IllegalArgumentException("Param '" + PARAM_DIR + "' " + DIR_LIST + " requires a folder: " + baseItemId);
+		}
+		if (DIR_LIST.equals(dir) && outputPath != null) {
+			throw new IllegalArgumentException("Param '" + PARAM_DIR + "' " + DIR_LIST + " requires param 'output' set to empty string, only result-documents are committed.");
+		}
+
 		Set<CmsItemId> items = new LinkedHashSet<>();
 		String listing = null;
-		if (DIR_LIST.equals(dir)) {
-			if (item.getKind() != CmsItemKind.Folder) {
-				throw new IllegalArgumentException("Param '" + PARAM_DIR + "' " + DIR_LIST + " requires a folder: " + baseItemId);
-			}
-			if (outputPath != null) {
-				throw new IllegalArgumentException("Param '" + PARAM_DIR + "' " + DIR_LIST + " requires param 'output' set to empty string, only result-documents are committed.");
-			}
-			Set<CmsItemId> files = itemLookup.getImmediateFiles(baseItemId);
-			listing = getListing(baseItemId, files);
-			logger.info("Transform proceeding with a listing of {} items in folder: {}", files.size(), baseItemId);
-		} else if (item.getKind() == CmsItemKind.Folder) {
+		if (item.getKind() == CmsItemKind.Folder) {
 			Set<CmsItemId> files = itemLookup.getImmediateFiles(baseItemId);
 			// Filtering based on CmsItemClassificationXml in combination with tikahtml cms:class.
 			// Workaround for backend returning itemIds with p=-1, remove when fixed in backend. 
 			// Never transforms non-head anyway.
 			files.stream().filter(fileId -> isTransformable(fileId)).forEach(fileId -> items.add(fileId.withPegRev(null)));
 			logger.info("Transform proceeding with {} of {} items in folder: {}", items.size(), files.size(), baseItemId);
+			if (DIR_LIST.equals(dir)) {
+				// CMS-2028 A single transform of a listing of the folder, instead of each item.
+				listing = getListing(baseItemId, files, items);
+				items.clear();
+			}
 		} else {
 			items.add(baseItemId);
 		}
@@ -504,9 +506,9 @@ public class TransformServiceXsl implements TransformService {
 	
 	/**
 	 * CMS-2028 Listing of the immediate files in a folder, the source of a transform with param dir=list.
-	 * Inspired by 'svn list --xml', each entry with cms:logicalid and cms:transformable (same as dir=immediates).
+	 * Inspired by 'svn list --xml', each entry with cms:logicalid and cms:transformable (transformed with dir=immediates).
 	 */
-	String getListing(CmsItemId folderId, Set<CmsItemId> files) {
+	String getListing(CmsItemId folderId, Set<CmsItemId> files, Set<CmsItemId> transformable) {
 		TreeMap<String, CmsItemId> sorted = new TreeMap<>();
 		for (CmsItemId fileId : files) {
 			CmsItemId id = fileId.withPegRev(null);
@@ -520,7 +522,7 @@ public class TransformServiceXsl implements TransformService {
 		for (Map.Entry<String, CmsItemId> e : sorted.entrySet()) {
 			sb.append("<entry kind=\"file\"");
 			sb.append(" cms:logicalid=\"").append(escapeXml(e.getValue().getLogicalId())).append('"');
-			sb.append(" cms:transformable=\"").append(isTransformable(e.getValue())).append("\">");
+			sb.append(" cms:transformable=\"").append(transformable.contains(e.getValue())).append("\">");
 			sb.append("<name>").append(escapeXml(e.getKey())).append("</name>");
 			sb.append("</entry>\n");
 		}
