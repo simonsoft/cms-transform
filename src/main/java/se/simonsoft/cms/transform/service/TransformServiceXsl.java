@@ -551,6 +551,11 @@ public class TransformServiceXsl implements TransformService {
 	/**
 	 * CMS-2028 Listing of the immediate files in a folder, the source of a transform with param dir=list.
 	 * Inspired by 'svn list --xml', each entry with cms:logicalid and cms:transformable (transformed with dir=immediates).
+	 *
+	 * TODO: After the migration to Quarkus, serialize with Jackson (jackson-dataformat-xml XmlMapper) instead of
+	 * building the string, using classes matching the 'svn list --xml' format (lists/list/entry), the reverse of
+	 * SvnDatasetLoader in quarkus-svn-extension. Bind the "cms" prefix on the XMLStreamWriter (otherwise Woodstox
+	 * generates prefixes). The XSL would then match /lists/list, prepared for dir=recursive (same as the svn cli).
 	 */
 	String getListing(CmsItemId folderId, Set<CmsItemId> files, Set<CmsItemId> transformable) {
 		TreeMap<String, CmsItemId> sorted = new TreeMap<>();
