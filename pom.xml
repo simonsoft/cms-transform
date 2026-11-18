@@ -30,7 +30,7 @@
 		<dependency>
 			<groupId>se.simonsoft</groupId>
 			<artifactId>cms-xmlsource</artifactId>
-			<version>0.22.4-SNAPSHOT</version>
+			<version>0.22.4</version>
 		</dependency>
 		
 		<dependency>
