@@ -207,23 +207,23 @@ public class TransformServiceXsl implements TransformService {
 
 		Set<CmsItemId> items = new LinkedHashSet<>();
 		String listing = null;
-		if (item.getKind() == CmsItemKind.Folder) {
-			Set<CmsItemId> files = itemLookup.getImmediateFiles(baseItemId);
-			if (DIR_LIST.equals(dir)) {
-				if (outputPath != null) {
-					throw new IllegalArgumentException("Param '" + PARAM_DIR + "' " + DIR_LIST + " requires param 'output' set to empty string, only result-documents are committed.");
-				}
-				listing = getListing(baseItemId, files);
-				logger.info("Transform proceeding with a listing of {} items in folder: {}", files.size(), baseItemId);
-			} else {
-				// Filtering based on CmsItemClassificationXml in combination with tikahtml cms:class.
-				// Workaround for backend returning itemIds with p=-1, remove when fixed in backend. 
-				// Never transforms non-head anyway.
-				files.stream().filter(fileId -> isTransformable(fileId)).forEach(fileId -> items.add(fileId.withPegRev(null)));
-				logger.info("Transform proceeding with {} of {} items in folder: {}", items.size(), files.size(), baseItemId);
+		if (DIR_LIST.equals(dir)) {
+			if (item.getKind() != CmsItemKind.Folder) {
+				throw new IllegalArgumentException("Param '" + PARAM_DIR + "' " + DIR_LIST + " requires a folder: " + baseItemId);
 			}
-		} else if (DIR_LIST.equals(dir)) {
-			throw new IllegalArgumentException("Param '" + PARAM_DIR + "' " + DIR_LIST + " requires a folder: " + baseItemId);
+			if (outputPath != null) {
+				throw new IllegalArgumentException("Param '" + PARAM_DIR + "' " + DIR_LIST + " requires param 'output' set to empty string, only result-documents are committed.");
+			}
+			Set<CmsItemId> files = itemLookup.getImmediateFiles(baseItemId);
+			listing = getListing(baseItemId, files);
+			logger.info("Transform proceeding with a listing of {} items in folder: {}", files.size(), baseItemId);
+		} else if (item.getKind() == CmsItemKind.Folder) {
+			Set<CmsItemId> files = itemLookup.getImmediateFiles(baseItemId);
+			// Filtering based on CmsItemClassificationXml in combination with tikahtml cms:class.
+			// Workaround for backend returning itemIds with p=-1, remove when fixed in backend. 
+			// Never transforms non-head anyway.
+			files.stream().filter(fileId -> isTransformable(fileId)).forEach(fileId -> items.add(fileId.withPegRev(null)));
+			logger.info("Transform proceeding with {} of {} items in folder: {}", items.size(), files.size(), baseItemId);
 		} else {
 			items.add(baseItemId);
 		}
