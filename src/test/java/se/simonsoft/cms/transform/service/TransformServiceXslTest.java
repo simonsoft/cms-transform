@@ -684,6 +684,119 @@ public class TransformServiceXslTest {
 	}
 	
 	@Test
+	public void testTextOutput() throws Exception {
+		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);
+
+		Map<String, String> optionsParams = new HashMap<String, String>();
+		optionsParams.put("stylesheet", "/stylesheet/transform-text-output.xsl");
+		optionsParams.put("output", "");
+		optionsParams.put("comment", "Text output");
+		TransformConfigOptions configOptions = new TransformConfigOptions();
+		configOptions.setType("xsl");
+		configOptions.setParams(optionsParams);
+		TransformConfig config = new TransformConfig();
+		config.setActive(true);
+		config.setOptions(configOptions);
+
+		transformService.transform(itemId, config);
+
+		CmsItemId textId = new CmsItemIdArg(repo, new CmsItemPath("/doc/scripts/transform-test.txt"));
+		CmsItem textItem = lookup.getItem(textId);
+		assertEquals(itemId.getLogicalId(), textItem.getProperties().getString("abx:TransformBase"));
+		String text = getContents(textId);
+		assertEquals("Text output must not be XML serialized (no declaration, no escaping)",
+				"# Script with one line per section\n"
+				+ "svn propset meta:sample 'section1.xml' <path> &\n"
+				+ "svn propset meta:sample 'section2.xml' <path> &\n"
+				+ "svn propset meta:sample 'földer space/folder%20encoded/section3.xml' <path> &\n",
+				text);
+
+		CmsItemId noRootId = new CmsItemIdArg(repo, new CmsItemPath("/doc/scripts/no-root.xml"));
+		assertFalse("Result document without root element should be discarded", pathExists(noRootId));
+	}
+
+	private TransformConfig getConfigList(String dir, String output) {
+		Map<String, String> optionsParams = new HashMap<String, String>();
+		optionsParams.put("stylesheet", "/stylesheet/transform-list-output.xsl");
+		if (output != null) {
+			optionsParams.put("output", output);
+		}
+		optionsParams.put("comment", "Folder listing");
+		if (dir != null) {
+			optionsParams.put("dir", dir);
+		}
+		TransformConfigOptions configOptions = new TransformConfigOptions();
+		configOptions.setType("xsl");
+		configOptions.setParams(optionsParams);
+		TransformConfig config = new TransformConfig();
+		config.setActive(true);
+		config.setOptions(configOptions);
+		return config;
+	}
+
+	@Test
+	public void testDirList() throws Exception {
+		CmsItemId folderId = new CmsItemIdArg("x-svn:///svn/repo1/listing");
+		transformService.transform(folderId, getConfigList("list", ""));
+
+		// One transform of the folder listing, all files sorted by name with cms:transformable.
+		CmsItemId textId = new CmsItemIdArg(repo, new CmsItemPath("/listing/listing.txt"));
+		assertEquals("The folder is the transform base", folderId.getLogicalId(), lookup.getItem(textId).getProperties().getString("abx:TransformBase"));
+		assertEquals("/listing x-svn:///svn/repo1/listing\n"
+				+ "a & b.xml file true x-svn:///svn/repo1/listing/a%20&%20b.xml\n"
+				+ "c.xml file true x-svn:///svn/repo1/listing/c.xml\n"
+				+ "notes.txt file false x-svn:///svn/repo1/listing/notes.txt\n",
+				getContents(textId));
+	}
+
+	@Test
+	public void testDirListRequiresOutputEmpty() throws Exception {
+		try {
+			transformService.transform(new CmsItemIdArg("x-svn:///svn/repo1/listing"), getConfigList("list", "/doc"));
+			fail("The principal output of a listing has no path.");
+		} catch (IllegalArgumentException e) {
+			assertEquals("Param 'dir' list requires param 'output' set to empty string, only result-documents are committed.", e.getMessage());
+		}
+	}
+
+	@Test
+	public void testDirListRequiresFolder() throws Exception {
+		try {
+			transformService.transform(new CmsItemIdArg("x-svn:///svn/repo1/listing/c.xml"), getConfigList("list", ""));
+			fail("A file has no listing.");
+		} catch (IllegalArgumentException e) {
+			assertEquals("Param 'dir' list requires a folder: x-svn:///svn/repo1/listing/c.xml", e.getMessage());
+		}
+	}
+
+	@Test
+	public void testDirInvalid() throws Exception {
+		try {
+			transformService.transform(new CmsItemIdArg("x-svn:///svn/repo1/listing"), getConfigList("recursive", ""));
+			fail("Not yet supported.");
+		} catch (IllegalArgumentException e) {
+			assertEquals("Param 'dir' must be 'immediates' or 'list': recursive", e.getMessage());
+		}
+	}
+
+	private boolean pathExists(CmsItemId itemId) {
+		try {
+			lookup.getItem(itemId);
+			return true;
+		} catch (se.simonsoft.cms.item.info.CmsItemNotFoundException e) {
+			return false;
+		}
+	}
+
+	@Test
+	public void testEmptyExceptDeclaration() {
+		assertTrue(TransformServiceXsl.emptyExceptDeclaration("<?xml version=\"1.0\"?>\n "));
+		assertTrue(TransformServiceXsl.emptyExceptDeclaration(" \n"));
+		assertFalse(TransformServiceXsl.emptyExceptDeclaration("<?xml version=\"1.0\"?><a/>"));
+		assertFalse("Text without declaration", TransformServiceXsl.emptyExceptDeclaration("a"));
+	}
+
+	@Test
 	public void testEmptyTransformWillBeDiscarded() throws UnsupportedEncodingException {
 		
 		CmsItemId itemId = new CmsItemIdArg(transformTestDoc);

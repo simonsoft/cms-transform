@@ -19,6 +19,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
+import java.io.StringReader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
@@ -34,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 
 import javax.inject.Inject;
 import javax.xml.transform.stream.StreamSource;
@@ -105,6 +107,11 @@ public class TransformServiceXsl implements TransformService {
 	// Transform and validate without locking or committing, fail if items that would be modified are locked.
 	// Lowercase like the AWS CLI --dryrun, so also forwarded to the XSL like the other lowercase params.
 	private static final String PARAM_DRYRUN = "dryrun";
+	// CMS-2028 Folder transform: "immediates" (default) transforms each immediate file, "list" transforms a listing
+	// of the folder once (the XSL can access each item via cmsfn functions or doc()). Not yet: "recursive" (as svn).
+	private static final String PARAM_DIR = "dir";
+	static final String DIR_IMMEDIATES = "immediates";
+	static final String DIR_LIST = "list";
 
 	private static final int HTTP_URL_CONNECTION_READ_TIMEOUT = 60000;  	// 60 seconds
 	private static final int HTTP_URL_CONNECTION_CONNECT_TIMEOUT = 30000;  	// 30 seconds
@@ -192,7 +199,20 @@ public class TransformServiceXsl implements TransformService {
 			}
 		}
 
+		final String dir = getParamOptional(config.getOptions().getParams(), PARAM_DIR).orElse(DIR_IMMEDIATES);
+		if (!DIR_IMMEDIATES.equals(dir) && !DIR_LIST.equals(dir)) {
+			throw new IllegalArgumentException("Param '" + PARAM_DIR + "' must be '" + DIR_IMMEDIATES + "' or '" + DIR_LIST + "': " + dir);
+		}
+
+		if (DIR_LIST.equals(dir) && item.getKind() != CmsItemKind.Folder) {
+			throw new IllegalArgumentException("Param '" + PARAM_DIR + "' " + DIR_LIST + " requires a folder: " + baseItemId);
+		}
+		if (DIR_LIST.equals(dir) && outputPath != null) {
+			throw new IllegalArgumentException("Param '" + PARAM_DIR + "' " + DIR_LIST + " requires param 'output' set to empty string, only result-documents are committed.");
+		}
+
 		Set<CmsItemId> items = new LinkedHashSet<>();
+		String listing = null;
 		if (item.getKind() == CmsItemKind.Folder) {
 			Set<CmsItemId> files = itemLookup.getImmediateFiles(baseItemId);
 			// Filtering based on CmsItemClassificationXml in combination with tikahtml cms:class.
@@ -200,6 +220,11 @@ public class TransformServiceXsl implements TransformService {
 			// Never transforms non-head anyway.
 			files.stream().filter(fileId -> isTransformable(fileId)).forEach(fileId -> items.add(fileId.withPegRev(null)));
 			logger.info("Transform proceeding with {} of {} items in folder: {}", items.size(), files.size(), baseItemId);
+			if (DIR_LIST.equals(dir)) {
+				// CMS-2028 A single transform of a listing of the folder, instead of each item.
+				listing = getListing(baseItemId, files, items);
+				items.clear();
+			}
 		} else {
 			items.add(baseItemId);
 		}
@@ -207,6 +232,9 @@ public class TransformServiceXsl implements TransformService {
 		// Locked items can be any items in the repository (any number), not just the input items.
 		final Set<CmsItemLock> locked = new HashSet<>();
 		try {
+			if (listing != null) {
+				locked.addAll(transformListing(baseItemId, listing, config, transformerService, transformOptions, patchset, schemaValidation, result));
+			}
 			for (CmsItemId id: items) {
 				locked.addAll(transformItem(id, config, transformerService, transformOptions, patchset, schemaValidation, result));
 			}
@@ -445,9 +473,11 @@ public class TransformServiceXsl implements TransformService {
 					}
 				}
 				
-				XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(href);
-				TransformStreamProvider streamProvider = transformerOutput.getTransformStreamProvider(resultDocument, null);
-				CmsItemLock lock = addToPatchset(patchset, path, validateSchema(schemaValidation, path, streamProvider.get()), overwrite, props, result);
+				InputStream stream = getResultDocumentStream(outputURIResolver, href, path, schemaValidation);
+				if (stream == null) {
+					continue;
+				}
+				CmsItemLock lock = addToPatchset(patchset, path, stream, overwrite, props, result);
 				if (lock != null) locked.add(lock);
 			}
 		} catch (RuntimeException e) {
@@ -458,6 +488,101 @@ public class TransformServiceXsl implements TransformService {
 		return locked;
 	}
 	
+	/**
+	 * CMS-2028 A single transform of a listing of a folder (param dir=list), see {@link #getListing(CmsItemId, Set, Set)}.
+	 * Only result-documents are committed, the output param is empty string (hrefs relative to the repository root).
+	 */
+	private Set<CmsItemLock> transformListing(CmsItemId folderId, String listing, TransformConfig config, TransformerService transformerService, TransformOptions transformOptions, CmsPatchset patchset, TransformSchemaValidation schemaValidation, TransformResult result) {
+
+		logger.debug("Transforming listing of folder: {}", folderId);
+		final CmsItemPropertiesMap props = getProperties(folderId, config);
+		final boolean overwrite = Boolean.valueOf(config.getOptions().getParams().get("overwrite"));
+		final Set<CmsItemLock> locked = new HashSet<>();
+
+		SaxonOutputURIResolverXdm outputURIResolver = new SaxonOutputURIResolverXdm(sourceReader);
+		transformOptions.setOutputURIResolver(outputURIResolver);
+
+		try {
+			// Discard the principal output.
+			transformerService.getTransformStreamProvider(new StringReader(listing), transformOptions).get();
+
+			for (String href: outputURIResolver.getResultDocumentHrefs()) {
+				String decodedHref = decodeHref(href); // Items will be commited with decoded hrefs.
+				CmsItemPath path;
+				try {
+					path = new CmsItemPath(decodedHref);
+				} catch (IllegalArgumentException e) {
+					throw new IllegalArgumentException("The href must be a valid CmsItemPath when output path is configured to repository root: " + decodedHref, e);
+				}
+				InputStream stream = getResultDocumentStream(outputURIResolver, href, path, schemaValidation);
+				if (stream == null) {
+					continue;
+				}
+				CmsItemLock lock = addToPatchset(patchset, path, stream, overwrite, props, result);
+				if (lock != null) locked.add(lock);
+			}
+		} catch (RuntimeException e) {
+			// Unlock locks taken in this invocation of transformListing.
+			unlockItemsFailure(locked);
+			throw e;
+		}
+		return locked;
+	}
+
+	/**
+	 * @return the result-document after the output transform and schema validation, or a text result-document as is,
+	 * null if it should be discarded
+	 */
+	private InputStream getResultDocumentStream(SaxonOutputURIResolverXdm outputURIResolver, String href, CmsItemPath path, TransformSchemaValidation schemaValidation) {
+		XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(href);
+		if (resultDocument != null) {
+			TransformStreamProvider streamProvider = transformerOutput.getTransformStreamProvider(resultDocument, null);
+			return validateSchema(schemaValidation, path, streamProvider.get());
+		}
+		// CMS-2028 Text result-document (method="text"), e.g. a script generated by the transform.
+		// Not processed by the output transform and never schema validated.
+		InputStream text = outputURIResolver.getResultTextInputStream(href);
+		if (text == null) {
+			logger.warn("Transform of item at path: '{}' resulted in a document without root element, will be discarded.", path);
+		}
+		return text;
+	}
+
+	/**
+	 * CMS-2028 Listing of the immediate files in a folder, the source of a transform with param dir=list.
+	 * Inspired by 'svn list --xml', each entry with cms:logicalid and cms:transformable (transformed with dir=immediates).
+	 *
+	 * TODO: After the migration to Quarkus, serialize with Jackson (jackson-dataformat-xml XmlMapper) instead of
+	 * building the string, using classes matching the 'svn list --xml' format (lists/list/entry), the reverse of
+	 * SvnDatasetLoader in quarkus-svn-extension. Bind the "cms" prefix on the XMLStreamWriter (otherwise Woodstox
+	 * generates prefixes). The XSL would then match /lists/list, prepared for dir=recursive (same as the svn cli).
+	 */
+	String getListing(CmsItemId folderId, Set<CmsItemId> files, Set<CmsItemId> transformable) {
+		TreeMap<String, CmsItemId> sorted = new TreeMap<>();
+		for (CmsItemId fileId : files) {
+			CmsItemId id = fileId.withPegRev(null);
+			sorted.put(id.getRelPath().getName(), id);
+		}
+		StringBuilder sb = new StringBuilder();
+		sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+		sb.append("<list xmlns:cms=\"http://www.simonsoft.se/namespace/cms\"");
+		sb.append(" path=\"").append(escapeXml(folderId.getRelPath().getPath())).append('"');
+		sb.append(" cms:logicalid=\"").append(escapeXml(folderId.withPegRev(null).getLogicalId())).append("\">\n");
+		for (Map.Entry<String, CmsItemId> e : sorted.entrySet()) {
+			sb.append("<entry kind=\"file\"");
+			sb.append(" cms:logicalid=\"").append(escapeXml(e.getValue().getLogicalId())).append('"');
+			sb.append(" cms:transformable=\"").append(transformable.contains(e.getValue())).append("\">");
+			sb.append("<name>").append(escapeXml(e.getKey())).append("</name>");
+			sb.append("</entry>\n");
+		}
+		sb.append("</list>\n");
+		return sb.toString();
+	}
+
+	private static String escapeXml(String s) {
+		return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+	}
+
 	private void unlockItemsFailure(Set<CmsItemLock> locked) {
 		logger.info("Transform failed, unlocking {} items.", locked.size());
 		try {
@@ -646,7 +771,9 @@ public class TransformServiceXsl implements TransformService {
 	}
 
 	static boolean emptyExceptDeclaration(String data) {
-		return data.substring(data.indexOf("?>") + 2).trim().isEmpty();
+		// A text document has no declaration.
+		int declarationEnd = data.indexOf("?>");
+		return (declarationEnd < 0 ? data : data.substring(declarationEnd + 2)).trim().isEmpty();
 	}
 
 	/**
