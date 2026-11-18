@@ -16,10 +16,10 @@
 package se.simonsoft.cms.transform.service;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
+import java.io.StringReader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
@@ -30,12 +30,13 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.function.Function;
 
 import javax.inject.Inject;
 import javax.xml.transform.stream.StreamSource;
@@ -107,6 +108,11 @@ public class TransformServiceXsl implements TransformService {
 	// Transform and validate without locking or committing, fail if items that would be modified are locked.
 	// Lowercase like the AWS CLI --dryrun, so also forwarded to the XSL like the other lowercase params.
 	private static final String PARAM_DRYRUN = "dryrun";
+	// CMS-2028 Folder transform: "immediates" (default) transforms each immediate file, "list" transforms a listing
+	// of the folder once (the XSL can access each item via cmsfn functions or doc()). Not yet: "recursive" (as svn).
+	private static final String PARAM_DIR = "dir";
+	static final String DIR_IMMEDIATES = "immediates";
+	static final String DIR_LIST = "list";
 
 	private static final int HTTP_URL_CONNECTION_READ_TIMEOUT = 60000;  	// 60 seconds
 	private static final int HTTP_URL_CONNECTION_CONNECT_TIMEOUT = 30000;  	// 30 seconds
@@ -194,30 +200,43 @@ public class TransformServiceXsl implements TransformService {
 			}
 		}
 
+		final String dir = getParamOptional(config.getOptions().getParams(), PARAM_DIR).orElse(DIR_IMMEDIATES);
+		if (!DIR_IMMEDIATES.equals(dir) && !DIR_LIST.equals(dir)) {
+			throw new IllegalArgumentException("Param '" + PARAM_DIR + "' must be '" + DIR_IMMEDIATES + "' or '" + DIR_LIST + "': " + dir);
+		}
+
 		Set<CmsItemId> items = new LinkedHashSet<>();
+		String listing = null;
 		if (item.getKind() == CmsItemKind.Folder) {
 			Set<CmsItemId> files = itemLookup.getImmediateFiles(baseItemId);
-			// Filtering based on CmsItemClassificationXml in combination with tikahtml cms:class.
-			// Workaround for backend returning itemIds with p=-1, remove when fixed in backend. 
-			// Never transforms non-head anyway.
-			files.stream().filter(fileId -> isTransformable(fileId)).forEach(fileId -> items.add(fileId.withPegRev(null)));
-			logger.info("Transform proceeding with {} of {} items in folder: {}", items.size(), files.size(), baseItemId);
+			if (DIR_LIST.equals(dir)) {
+				if (outputPath != null) {
+					throw new IllegalArgumentException("Param '" + PARAM_DIR + "' " + DIR_LIST + " requires param 'output' set to empty string, only result-documents are committed.");
+				}
+				listing = getListing(baseItemId, files);
+				logger.info("Transform proceeding with a listing of {} items in folder: {}", files.size(), baseItemId);
+			} else {
+				// Filtering based on CmsItemClassificationXml in combination with tikahtml cms:class.
+				// Workaround for backend returning itemIds with p=-1, remove when fixed in backend. 
+				// Never transforms non-head anyway.
+				files.stream().filter(fileId -> isTransformable(fileId)).forEach(fileId -> items.add(fileId.withPegRev(null)));
+				logger.info("Transform proceeding with {} of {} items in folder: {}", items.size(), files.size(), baseItemId);
+			}
+		} else if (DIR_LIST.equals(dir)) {
+			throw new IllegalArgumentException("Param '" + PARAM_DIR + "' " + DIR_LIST + " requires a folder: " + baseItemId);
 		} else {
 			items.add(baseItemId);
 		}
 		
 		// Locked items can be any items in the repository (any number), not just the input items.
 		final Set<CmsItemLock> locked = new HashSet<>();
-		// CMS-2028 Text result-documents, concatenated per path across all items (e.g. one script per folder).
-		final Map<CmsItemPath, ByteArrayOutputStream> textOutputs = new LinkedHashMap<>();
 		try {
-			for (CmsItemId id: items) {
-				locked.addAll(transformItem(id, config, transformerService, transformOptions, patchset, schemaValidation, result, textOutputs));
+			if (listing != null) {
+				final String source = listing;
+				locked.addAll(transformItem(baseItemId, options -> transformerService.getTransformStreamProvider(new StringReader(source), options), config, transformOptions, patchset, schemaValidation, result));
 			}
-			final boolean overwrite = Boolean.valueOf(config.getOptions().getParams().get("overwrite"));
-			for (Map.Entry<CmsItemPath, ByteArrayOutputStream> text : textOutputs.entrySet()) {
-				CmsItemLock lock = addToPatchset(patchset, text.getKey(), new ByteArrayInputStream(text.getValue().toByteArray()), overwrite, getProperties(baseItemId, config), result);
-				if (lock != null) locked.add(lock);
+			for (CmsItemId id: items) {
+				locked.addAll(transformItem(id, options -> transformerService.getTransformStreamProvider(id, options), config, transformOptions, patchset, schemaValidation, result));
 			}
 		} catch (RuntimeException e) {
 			logger.warn("Failed to transform / lock items: {}", e.getMessage(), e);
@@ -411,7 +430,11 @@ public class TransformServiceXsl implements TransformService {
 		return item.isCmsClass("tikahtml");
     }
 	
-	private Set<CmsItemLock> transformItem(CmsItemId baseItemId, TransformConfig config, TransformerService transformerService, TransformOptions transformOptions, CmsPatchset patchset, TransformSchemaValidation schemaValidation, TransformResult result, Map<CmsItemPath, ByteArrayOutputStream> textOutputs) {
+	/**
+	 * @param baseItemId the transformed item, or the folder when transforming a listing
+	 * @param source provides the transform of the item (or listing)
+	 */
+	private Set<CmsItemLock> transformItem(CmsItemId baseItemId, Function<TransformOptions, TransformStreamProvider> source, TransformConfig config, TransformOptions transformOptions, CmsPatchset patchset, TransformSchemaValidation schemaValidation, TransformResult result) {
 		
 		logger.debug("Transforming itemid: {}", baseItemId);
 		final CmsItemPropertiesMap props = getProperties(baseItemId, config);
@@ -425,7 +448,7 @@ public class TransformServiceXsl implements TransformService {
 		
 		try {
 			
-			TransformStreamProvider baseStreamProvider = transformerService.getTransformStreamProvider(baseItemId, transformOptions);
+			TransformStreamProvider baseStreamProvider = source.apply(transformOptions);
 			// Detects empty stream and aborts them via EmptyStreamException, which is caught and logged as warning.
 			// Assume only non-principal output if the output path is explicitly set to repo root.
 			if (outputPath != null) {
@@ -454,25 +477,20 @@ public class TransformServiceXsl implements TransformService {
 					}
 				}
 				
+				InputStream stream;
 				XmlSourceDocumentS9api resultDocument = outputURIResolver.getResultDocument(href);
-				if (resultDocument == null) {
+				if (resultDocument != null) {
+					TransformStreamProvider streamProvider = transformerOutput.getTransformStreamProvider(resultDocument, null);
+					stream = validateSchema(schemaValidation, path, streamProvider.get());
+				} else {
 					// CMS-2028 Text result-document (method="text"), e.g. a script generated by the transform.
-					// Not processed by the output transform and never schema validated. Added to the patchset after
-					// all items, concatenated in item order when several items produce the same path.
-					InputStream text = outputURIResolver.getResultTextInputStream(href);
-					if (text == null) {
-						logger.warn("Transform of item at path: '{}' resulted in a document without root element, will be discarded.", path);
-					} else {
-						try {
-							textOutputs.computeIfAbsent(path, p -> new ByteArrayOutputStream()).write(text.readAllBytes());
-						} catch (IOException e) {
-							throw new RuntimeException("Failed to read text result-document: " + path, e);
-						}
-					}
+					// Not processed by the output transform and never schema validated.
+					stream = outputURIResolver.getResultTextInputStream(href);
+				}
+				if (stream == null) {
+					logger.warn("Transform of item at path: '{}' resulted in a document without root element, will be discarded.", path);
 					continue;
 				}
-				TransformStreamProvider streamProvider = transformerOutput.getTransformStreamProvider(resultDocument, null);
-				InputStream stream = validateSchema(schemaValidation, path, streamProvider.get());
 				CmsItemLock lock = addToPatchset(patchset, path, stream, overwrite, props, result);
 				if (lock != null) locked.add(lock);
 			}
@@ -484,6 +502,36 @@ public class TransformServiceXsl implements TransformService {
 		return locked;
 	}
 	
+	/**
+	 * CMS-2028 Listing of the immediate files in a folder, the source of a transform with param dir=list.
+	 * Inspired by 'svn list --xml', each entry with cms:logicalid and cms:transformable (same as dir=immediates).
+	 */
+	String getListing(CmsItemId folderId, Set<CmsItemId> files) {
+		TreeMap<String, CmsItemId> sorted = new TreeMap<>();
+		for (CmsItemId fileId : files) {
+			CmsItemId id = fileId.withPegRev(null);
+			sorted.put(id.getRelPath().getName(), id);
+		}
+		StringBuilder sb = new StringBuilder();
+		sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+		sb.append("<list xmlns:cms=\"http://www.simonsoft.se/namespace/cms\"");
+		sb.append(" path=\"").append(escapeXml(folderId.getRelPath().getPath())).append('"');
+		sb.append(" cms:logicalid=\"").append(escapeXml(folderId.withPegRev(null).getLogicalId())).append("\">\n");
+		for (Map.Entry<String, CmsItemId> e : sorted.entrySet()) {
+			sb.append("<entry kind=\"file\"");
+			sb.append(" cms:logicalid=\"").append(escapeXml(e.getValue().getLogicalId())).append('"');
+			sb.append(" cms:transformable=\"").append(isTransformable(e.getValue())).append("\">");
+			sb.append("<name>").append(escapeXml(e.getKey())).append("</name>");
+			sb.append("</entry>\n");
+		}
+		sb.append("</list>\n");
+		return sb.toString();
+	}
+
+	private static String escapeXml(String s) {
+		return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+	}
+
 	private void unlockItemsFailure(Set<CmsItemLock> locked) {
 		logger.info("Transform failed, unlocking {} items.", locked.size());
 		try {

@@ -715,29 +715,68 @@ public class TransformServiceXslTest {
 		assertFalse("Result document without root element should be discarded", pathExists(noRootId));
 	}
 
-	@Test
-	public void testTextOutputFolderConcatenated() throws Exception {
-		// Each item in the folder produces the same text result-document href.
-		CmsItemId folderId = new CmsItemIdArg("x-svn:///svn/repo1/transformed/multiple/existing");
-
+	private TransformConfig getConfigList(String dir, String output) {
 		Map<String, String> optionsParams = new HashMap<String, String>();
-		optionsParams.put("stylesheet", "/stylesheet/transform-text-output.xsl");
-		optionsParams.put("output", "");
-		optionsParams.put("comment", "Text output per folder");
+		optionsParams.put("stylesheet", "/stylesheet/transform-list-output.xsl");
+		if (output != null) {
+			optionsParams.put("output", output);
+		}
+		optionsParams.put("comment", "Folder listing");
+		if (dir != null) {
+			optionsParams.put("dir", dir);
+		}
 		TransformConfigOptions configOptions = new TransformConfigOptions();
 		configOptions.setType("xsl");
 		configOptions.setParams(optionsParams);
 		TransformConfig config = new TransformConfig();
 		config.setActive(true);
 		config.setOptions(configOptions);
+		return config;
+	}
 
-		transformService.transform(folderId, config);
+	@Test
+	public void testDirList() throws Exception {
+		CmsItemId folderId = new CmsItemIdArg("x-svn:///svn/repo1/listing");
+		transformService.transform(folderId, getConfigList("list", ""));
 
-		CmsItemId textId = new CmsItemIdArg(repo, new CmsItemPath("/doc/scripts/transform-test.txt"));
-		assertEquals("Folder is the transform base of the concatenated output", folderId.getLogicalId(), lookup.getItem(textId).getProperties().getString("abx:TransformBase"));
-		String text = getContents(textId);
-		assertEquals("One text output per item, concatenated: " + text, 4, text.split("# Script with one line per section", -1).length - 1);
-		assertEquals("Sections of all items: " + text, 3 + 2, text.split("svn propset", -1).length - 1);
+		// One transform of the folder listing, all files sorted by name with cms:transformable.
+		CmsItemId textId = new CmsItemIdArg(repo, new CmsItemPath("/listing/listing.txt"));
+		assertEquals("The folder is the transform base", folderId.getLogicalId(), lookup.getItem(textId).getProperties().getString("abx:TransformBase"));
+		assertEquals("/listing x-svn:///svn/repo1/listing\n"
+				+ "a & b.xml file true x-svn:///svn/repo1/listing/a%20&%20b.xml\n"
+				+ "c.xml file true x-svn:///svn/repo1/listing/c.xml\n"
+				+ "notes.txt file false x-svn:///svn/repo1/listing/notes.txt\n",
+				getContents(textId));
+	}
+
+	@Test
+	public void testDirListRequiresOutputEmpty() throws Exception {
+		try {
+			transformService.transform(new CmsItemIdArg("x-svn:///svn/repo1/listing"), getConfigList("list", "/doc"));
+			fail("The principal output of a listing has no path.");
+		} catch (IllegalArgumentException e) {
+			assertEquals("Param 'dir' list requires param 'output' set to empty string, only result-documents are committed.", e.getMessage());
+		}
+	}
+
+	@Test
+	public void testDirListRequiresFolder() throws Exception {
+		try {
+			transformService.transform(new CmsItemIdArg("x-svn:///svn/repo1/listing/c.xml"), getConfigList("list", ""));
+			fail("A file has no listing.");
+		} catch (IllegalArgumentException e) {
+			assertEquals("Param 'dir' list requires a folder: x-svn:///svn/repo1/listing/c.xml", e.getMessage());
+		}
+	}
+
+	@Test
+	public void testDirInvalid() throws Exception {
+		try {
+			transformService.transform(new CmsItemIdArg("x-svn:///svn/repo1/listing"), getConfigList("recursive", ""));
+			fail("Not yet supported.");
+		} catch (IllegalArgumentException e) {
+			assertEquals("Param 'dir' must be 'immediates' or 'list': recursive", e.getMessage());
+		}
 	}
 
 	private boolean pathExists(CmsItemId itemId) {

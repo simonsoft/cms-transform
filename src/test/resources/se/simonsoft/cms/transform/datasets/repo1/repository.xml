@@ -225,6 +225,55 @@
 			<properties>
 			</properties>
 		</entry>
+		<entry kind="dir">
+			<name>listing</name>
+			<commit revision="1">
+				<author>m</author>
+				<date>2013-01-04T14:33:14.600772Z</date>
+			</commit>
+			<properties>
+			</properties>
+		</entry>
+		<entry kind="file">
+			<name>listing/a &amp; b.xml</name>
+			<size>707</size>
+			<commit revision="1">
+				<author>m</author>
+				<date>2013-01-04T14:33:14.600772Z</date>
+			</commit>
+			<properties>
+			</properties>
+		</entry>
+		<entry kind="file">
+			<name>listing/c.xml</name>
+			<size>699</size>
+			<commit revision="1">
+				<author>m</author>
+				<date>2013-01-04T14:33:14.600772Z</date>
+			</commit>
+			<properties>
+			</properties>
+		</entry>
+		<entry kind="file">
+			<name>listing/notes.txt</name>
+			<size>9</size>
+			<commit revision="1">
+				<author>m</author>
+				<date>2013-01-04T14:33:14.600772Z</date>
+			</commit>
+			<properties>
+			</properties>
+		</entry>
+		<entry kind="file">
+			<name>stylesheet/transform-list-output.xsl</name>
+			<size>1346</size>
+			<commit revision="1">
+				<author>m</author>
+				<date>2013-01-04T14:33:14.600772Z</date>
+			</commit>
+			<properties>
+			</properties>
+		</entry>
 		<entry kind="file">
 			<name>strict/transform-test.xml</name>
 			<size>1578</size>
